@@ -87,6 +87,13 @@ The debate streams live. At the gate you get the spec and four choices —
 feedback), or **reject**. The approved spec lands in
 `~/.duet/sessions/<id>/artifacts/IMPLEMENTATION.md`.
 
+If the models cannot agree, you get a disagreement report instead: what each
+one still holds, whether the debate was converging, and a choice of **resolve**
+or **abort**. Choosing resolve opens an editor listing every unresolved
+objection with space for your decision on each; those become `FIXED:` items the
+models must accept, and the debate resumes with a raised round cap. Objections
+you leave blank come back.
+
 Longer briefs come from a file, and background material from `--context`:
 
 ```bash

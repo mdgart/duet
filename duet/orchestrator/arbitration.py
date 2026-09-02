@@ -115,9 +115,12 @@ def disagreement_report(
     lines += [
         "## Your options",
         "",
-        "- **resolve** — supply a ruling per objection; each becomes a `FIXED:` item",
-        "  and the debate resumes with the round cap raised by 2.",
-        "- **abort** — end the session; the log is retained.",
+        "- **resolve** — an editor opens with each objection above and space for your",
+        "  decision. Anything you write becomes a `FIXED:` item in the brief, which the",
+        "  models must treat as settled and may not object to; objections you leave blank",
+        "  come back. The debate then resumes with the round cap raised by 2.",
+        "- **abort** — end the session. The log and every draft are retained, and the",
+        "  brief can be re-run as a new session.",
         "",
     ]
     return "\n".join(lines)

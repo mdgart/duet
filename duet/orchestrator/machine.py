@@ -7,7 +7,7 @@ client, are all just things that append a `gate_decision` event.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Literal
 
 from duet.orchestrator.arbitration import disagreement_report
@@ -31,6 +31,7 @@ class GateRequest:
     options: list[str]
     artifacts: list[str]
     draft_hash: str
+    objections: list[dict] = field(default_factory=list)
 
 
 @dataclass
@@ -214,13 +215,37 @@ class Machine:
         log_ref = self.store.save_artifact(f"disagreement-r{result.state.round}.md", report)
         self._transition("ARBITRATION")
         return self._open_gate(
-            "arbitration", ARBITRATION_OPTIONS, [log_ref], result.state.draft_hash, result.detail
+            "arbitration",
+            ARBITRATION_OPTIONS,
+            [log_ref],
+            result.state.draft_hash,
+            result.detail,
+            # What is actually unresolved, so a client can ask for a ruling on
+            # each rather than for one undifferentiated blob of feedback.
+            objections=[
+                {
+                    "id": e.id,
+                    "severity": e.severity,
+                    "section": e.section,
+                    "claim": e.claim,
+                    "held_by": sorted(set(e.raised_by) - set(e.closed_by)),
+                }
+                for e in result.state.ledger.open_entries()
+            ],
         )
 
     def _open_gate(
-        self, gate: str, options: list[str], artifacts: list[str], draft_hash: str, detail: str
+        self,
+        gate: str,
+        options: list[str],
+        artifacts: list[str],
+        draft_hash: str,
+        detail: str,
+        objections: list[dict] | None = None,
     ) -> RunResult:
         payload = {"gate": gate, "options": options, "artifacts": artifacts, "draft_hash": draft_hash}
+        if objections:
+            payload["objections"] = objections
         self.store.append("gate_pending", payload)
         return RunResult(
             self.current_state(), suspended=True, gate=GateRequest(**payload), detail=detail
@@ -252,10 +277,20 @@ class Machine:
         return RunResult("FAILED", detail=f"unknown gate action {action!r}")
 
     def _brief_with(self, feedback: str) -> str:
+        """Fold a human decision back into the brief as FIXED: material.
+
+        Arbitration rulings arrive already marked — one FIXED: line per
+        objection — while free-form revision feedback is a single unmarked
+        note. Prefixing only when the marker is absent keeps both readable and
+        avoids "FIXED: FIXED: ...".
+        """
         brief = self.brief()
-        if not feedback.strip():
+        text = feedback.strip()
+        if not text:
             return brief
-        return f"{brief}\n\nFIXED: {feedback.strip()}"
+        if "FIXED:" not in text:
+            text = f"FIXED: {text}"
+        return f"{brief}\n\n{text}"
 
 
 def submit_gate_decision(

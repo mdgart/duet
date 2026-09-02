@@ -99,3 +99,63 @@ def test_review_is_refused_mid_debate(tmp_path: Path):
     result = machine.review("# Edited\n", "mauro")
     assert not result.suspended
     assert "cannot review from ARBITRATION" in result.detail
+
+
+# --- arbitration rulings -----------------------------------------------------
+
+
+def deadlocked(cfg, tmp_path: Path, after: dict | None = None):
+    """Deadlock at the cap. `after` supplies the turns a resolve would resume into.
+
+    r1 opus raises OBJ-1 (Architecture); r2 sol raises OBJ-2 (Data model).
+    """
+    cfg.debate.max_rounds = 2
+    after = after or {}
+    machine, store = machine_for(cfg, tmp_path, {
+        "sol": [spec("v1"), objects("Data model", "sol point", "blocking")] + after.get("sol", []),
+        "opus": [objects("Architecture", "opus point", "blocking"), spec("v2")] + after.get("opus", []),
+    })
+    return machine, store, machine.start("an app")
+
+
+def test_the_arbitration_gate_carries_what_is_unresolved(tmp_path: Path):
+    """A client cannot ask for a ruling per objection without knowing them."""
+    machine, _, result = deadlocked(roster("sol", "opus"), tmp_path)
+
+    assert result.state == "ARBITRATION"
+    ids = {o["id"] for o in result.gate.objections}
+    assert ids == {"OBJ-1", "OBJ-2"}
+    first = result.gate.objections[0]
+    assert {"id", "severity", "section", "claim", "held_by"} <= set(first)
+    assert first["held_by"], "an open objection is held by whoever will not close it"
+
+
+def test_rulings_become_separate_fixed_items(tmp_path: Path):
+    """The report promises a decision per objection, so one blob is not enough."""
+    cfg = roster("sol", "opus")
+    # A resolve raises the cap by 2, so the debate resumes: sol proposes r3
+    # closing its own OBJ-2, opus agrees having closed OBJ-1.
+    machine, store, _ = deadlocked(cfg, tmp_path, after={
+        "sol": [spec("v3", addresses=["OBJ-2"])],
+        "opus": [agrees(resolved=["OBJ-1"])],
+    })
+    submit_gate_decision(
+        store, action="resolve", actor="mauro",
+        feedback="FIXED: OBJ-1 — drop the cache entirely\nFIXED: OBJ-2 — page size is 50",
+    )
+    machine.advance()
+
+    brief = machine.brief()
+    assert "FIXED: OBJ-1 — drop the cache entirely" in brief
+    assert "FIXED: OBJ-2 — page size is 50" in brief
+    assert "FIXED: FIXED:" not in brief, "already-marked rulings must not be re-prefixed"
+
+
+def test_unmarked_revision_feedback_still_gets_the_marker(tmp_path: Path):
+    cfg = roster("sol", "opus")
+    scripts = {"sol": CONSENSUS["sol"] + [agrees()], "opus": CONSENSUS["opus"] + [spec("v4")]}
+    machine, store = machine_for(cfg, tmp_path, scripts)
+    machine.start("an app")
+    submit_gate_decision(store, action="revise", actor="mauro", feedback="must work offline")
+    machine.advance()
+    assert "FIXED: must work offline" in machine.brief()

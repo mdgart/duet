@@ -250,6 +250,59 @@ def _show_artifact(store: SessionStore, ref: str) -> None:
         console.print(body)
 
 
+RULING_HELP = """\
+# Rulings. Write your decision under each objection you want to settle; each
+# becomes a FIXED: item in the brief, which the models must treat as settled and
+# may not object to. Leave one blank to leave it open — an objection you do not
+# rule on comes back.
+#
+# Lines starting with # are ignored. Save and close when done.
+"""
+
+
+def _collect_rulings(gate) -> str:
+    """Ask for a ruling per open objection, in an editor.
+
+    One prompt line cannot hold a ruling: real ones run to paragraphs, and the
+    arbitration report promises a decision *per objection* rather than a single
+    undifferentiated note. The template carries each objection's id, severity
+    and claim so the decision is written next to what it settles.
+    """
+    if not gate.objections:
+        return typer.prompt("what should change")
+
+    blocks = [RULING_HELP]
+    for o in gate.objections:
+        held = ", ".join(o.get("held_by") or []) or "unresolved"
+        claim = "\n".join(f"#   {line}" for line in _wrap(o["claim"], 88))
+        blocks.append(
+            f"## {o['id']} — {o['severity']} (held by {held})\n"
+            f"# section: {o['section']}\n{claim}\n\n"
+        )
+    edited = _edit_text("\n".join(blocks))
+
+    rulings = []
+    current = None
+    for line in edited.splitlines():
+        if line.startswith("## "):
+            current = line[3:].split("—")[0].strip()
+            continue
+        if line.startswith("#") or not line.strip():
+            continue
+        if current:
+            rulings.append((current, line.strip()))
+    merged: dict[str, list[str]] = {}
+    for oid, text in rulings:
+        merged.setdefault(oid, []).append(text)
+    return "\n".join(f"FIXED: {oid} — {' '.join(lines)}" for oid, lines in merged.items())
+
+
+def _wrap(text: str, width: int) -> list[str]:
+    import textwrap as _tw
+
+    return _tw.wrap(text, width) or [""]
+
+
 def _drive(machine: Machine, store: SessionStore, cfg: DuetConfig, actor: str, result) -> None:
     """Loop between the engine and the human until the session terminates."""
     while result.suspended:
@@ -262,7 +315,13 @@ def _drive(machine: Machine, store: SessionStore, cfg: DuetConfig, actor: str, r
         while action not in gate.options:
             action = typer.prompt(f"choose one of {', '.join(gate.options)}")
         feedback = ""
-        if action in ("revise", "resolve"):
+        if action == "resolve":
+            feedback = _collect_rulings(gate)
+            if not feedback.strip():
+                console.print("[yellow]no rulings written[/] — nothing would change; pick again")
+                continue
+            console.print(f"[dim]{feedback.count('FIXED:')} ruling(s) recorded[/]")
+        elif action == "revise":
             feedback = typer.prompt("what should change")
         edited = ""
         if action == "edit":
