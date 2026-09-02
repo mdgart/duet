@@ -8,13 +8,17 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field
 
 EventType = Literal[
+    "session_start",
     "state_change",
     "model_call",
     "model_response",
+    "model_chunk",
+    "draft",
     "verdict",
     "tool_call",
     "tool_result",
     "test_run",
+    "gate_pending",
     "gate_decision",
     "commit",
     "cost_tick",

@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import uuid
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any, Callable, Iterator
 
 from duet.schemas.config import duet_home
 from duet.schemas.events import Event, EventType
@@ -29,10 +29,52 @@ class SessionStore:
         self.log_path = self.dir / "log.jsonl"
         self._seq = self._last_seq()
         self._cost_usd = self._replay_cost()
+        self._listeners: list[Callable[[Event], None]] = []
+
+    def subscribe(self, listener: Callable[[Event], None]) -> None:
+        """Called on every appended event. The CLI renders from this; a web
+        backend would push the same stream to a browser (PLAN §6)."""
+        self._listeners.append(listener)
 
     @classmethod
-    def new(cls, root: Path | None = None) -> "SessionStore":
-        return cls(uuid.uuid4().hex[:12], root=root)
+    def new(cls, root: Path | None = None, owner: str = "") -> "SessionStore":
+        """Create a session, recording who owns it.
+
+        Ownership is written once, at creation, because it cannot be recovered
+        later: a session with no recorded owner is anonymous forever, and every
+        multi-user feature — listing your own work, resuming it, deciding who
+        may answer a gate — is a query against this field. In v1 the owner is
+        the local user; in a hosted deployment it is an account id.
+
+        The id is a full uuid4 rather than a truncated one so that it is never
+        the weak link if a session id reaches a URL; `resolve` keeps it typable.
+        """
+        store = cls(uuid.uuid4().hex, root=root)
+        store.append("session_start", {"owner": owner, "session_id": store.session_id})
+        return store
+
+    @classmethod
+    def resolve(cls, prefix: str, root: Path | None = None) -> str:
+        """Find a session by unambiguous id prefix, the way git resolves a sha."""
+        sessions = cls.list_sessions(root)
+        if prefix in sessions:
+            return prefix
+        matches = [s for s in sessions if s.startswith(prefix)]
+        if len(matches) == 1:
+            return matches[0]
+        if not matches:
+            raise ValueError(f"no session id starts with {prefix!r}")
+        raise ValueError(
+            f"{prefix!r} is ambiguous — {len(matches)} sessions match: "
+            + ", ".join(m[:12] for m in matches)
+        )
+
+    @property
+    def owner(self) -> str:
+        for event in self.events():
+            if event.type == "session_start":
+                return event.payload.get("owner", "")
+        return ""
 
     @classmethod
     def list_sessions(cls, root: Path | None = None) -> list[str]:
@@ -50,6 +92,8 @@ class SessionStore:
             f.write(event.model_dump_json() + "\n")
         if type == "cost_tick":
             self._cost_usd += float(payload.get("cost_usd", 0.0))
+        for listener in self._listeners:
+            listener(event)
         return event
 
     def events(self) -> Iterator[Event]:

@@ -31,6 +31,15 @@ class Usage(BaseModel):
     cost_usd: float = 0.0
 
 
+class Chunk(BaseModel):
+    """One increment of a streamed turn (SPECS §3)."""
+
+    text: str = ""
+    done: bool = False
+    usage: Usage | None = None
+    streamed: bool = True  # False when the adapter fell back to one terminal chunk
+
+
 class ModelRequest(BaseModel):
     system: str
     messages: list[Turn]

@@ -28,3 +28,4 @@ packages = ["duet"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = ["contract: hits real provider APIs; opt in with DUET_CONTRACT=1"]
