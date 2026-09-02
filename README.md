@@ -116,8 +116,16 @@ You are billed by the providers directly. A converged three-round debate costs
 **about 5–10 cents** on the default roster, and **$1–2** on flagships.
 
 Defaults are chosen to be safe to run by accident: small models from each lab,
-and a `$5` cap. Hitting the cap *suspends* the session — raise
-`budget.max_usd` and `duet resume` continues from where it stopped.
+and a `$5` cap. Hitting the cap *suspends* the session rather than ending it —
+raise the cap and carry on from where it stopped:
+
+```bash
+duet resume <id> --budget 15
+```
+
+Nothing is lost or repeated: the budget is checked between turns, so no turn you
+paid for is discarded, and the debate resumes from the log rather than
+restarting.
 
 ```bash
 duet new "an idea" --profile flagship   # gpt-5.6-sol + claude-opus-5

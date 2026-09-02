@@ -121,6 +121,18 @@ def _load_context(paths: list[Path]) -> str:
     return "\n\n".join(blocks)
 
 
+def _budgeted(cfg: DuetConfig, budget: Optional[float]) -> DuetConfig:
+    """Apply a --budget override.
+
+    A budget stop suspends the session, and lifting it means raising the cap —
+    so the cap has to be adjustable at the moment you are blocked, not only by
+    editing a config file first.
+    """
+    if budget is not None:
+        cfg.budget.max_usd = budget
+    return cfg
+
+
 def _warn_unpriced(cfg: DuetConfig) -> None:
     """Say so before spending, not after."""
     unpriced = cfg.unpriced_participants()
@@ -276,9 +288,10 @@ def new(
     profile: Optional[str] = typer.Option(None),
     config_path: Optional[Path] = typer.Option(None, "--config"),
     actor: str = typer.Option(getpass.getuser(), help="Who is answering the gates"),
+    budget: Optional[float] = typer.Option(None, "--budget", help="Override budget.max_usd"),
 ):
     """Start a session: debate an idea into an approved spec (Phase A)."""
-    cfg = load_config(config_path, profile)
+    cfg = _budgeted(load_config(config_path, profile), budget)
     brief = Path(idea[1:]).read_text() if idea.startswith("@") else idea
     context = _load_context(context_paths)
     store = SessionStore.new(owner=actor)
@@ -300,9 +313,12 @@ def resume(
     profile: Optional[str] = typer.Option(None),
     config_path: Optional[Path] = typer.Option(None, "--config"),
     actor: str = typer.Option(getpass.getuser(), help="Who is answering the gates"),
+    budget: Optional[float] = typer.Option(
+        None, "--budget", help="Override budget.max_usd — how you lift a budget stop"
+    ),
 ):
     """Continue a suspended session — including one started by another process."""
-    cfg = load_config(config_path, profile)
+    cfg = _budgeted(load_config(config_path, profile), budget)
     try:
         session_id = SessionStore.resolve(session_id)
     except ValueError as e:
@@ -325,13 +341,14 @@ def review(
     profile: Optional[str] = typer.Option(None),
     config_path: Optional[Path] = typer.Option(None, "--config"),
     actor: str = typer.Option(getpass.getuser(), help="Who is proposing the revision"),
+    budget: Optional[float] = typer.Option(None, "--budget", help="Override budget.max_usd"),
 ):
     """Put an edited spec back in front of the models for one critique round.
 
     You take the proposer turn: you supply the revision, they critique it. One
     call per participant, no revision cycle — cheap enough to use on every edit.
     """
-    cfg = load_config(config_path, profile)
+    cfg = _budgeted(load_config(config_path, profile), budget)
     try:
         session_id = SessionStore.resolve(session_id)
     except ValueError as e:

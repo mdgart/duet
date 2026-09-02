@@ -145,3 +145,32 @@ def test_resume_refuses_an_unknown_id(monkeypatch, tmp_path: Path):
     result = runner.invoke(cli.app, ["resume", "nosuchsession"])
     assert result.exit_code == 1
     assert "no session id starts with" in result.output
+
+
+def test_budget_override_lifts_a_stop_without_editing_config(monkeypatch, tmp_path: Path):
+    """A budget stop suspends the session; lifting it means raising the cap. That
+    has to be possible at the moment you are blocked, not only by editing a file."""
+    from duet.schemas.config import DuetConfig as _Cfg
+
+    cfg = stub(monkeypatch, tmp_path)
+    cfg.budget.max_usd = 0.0025  # two scripted calls in
+    started = runner.invoke(cli.app, ["new", "an app"], input="")
+    assert "BUDGET_STOP" in started.output, started.output
+    session_id = started.output.split("session ")[1].split()[0]
+
+    # Resuming at the same cap explains itself rather than silently doing nothing.
+    blocked = runner.invoke(cli.app, ["resume", session_id], input="")
+    assert "raise budget.max_usd" in blocked.output
+
+    # Raising it continues the debate from the log. The stop landed after opus
+    # drafted round 2, so the resumed run owes sol's critique of it and then
+    # round 3 — the scripts pick up exactly there, which is itself the proof
+    # that nothing is replayed twice.
+    monkeypatch.setattr(cli, "providers_for", lambda c: {
+        "sol": FakeProvider("fake", "model-sol", [parsed(o) for o in (
+            objects("Data model", "no pagination"), spec("v3", addresses=["OBJ-2"]))]),
+        "opus": FakeProvider("fake", "model-opus", [parsed(agrees())]),
+    })
+    lifted = runner.invoke(cli.app, ["resume", session_id, "--budget", "25"], input="approve\n")
+    assert lifted.exit_code == 0, lifted.output
+    assert "DONE" in lifted.output
