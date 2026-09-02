@@ -105,7 +105,7 @@ text; no URL in it is ever fetched.
 | `duet new "<idea>"` | Start a debate. `@file.md` reads a brief from disk. |
 | `duet resume <id>` | Continue a suspended session. Any unambiguous id prefix works. |
 | `duet review <id>` | Put an edited spec back to the models for one critique round. |
-| `duet sessions` | List sessions with owner, state and cost. |
+| `duet sessions` | List sessions — what each was about, owner, state and cost, newest first. |
 | `duet roster` | Show participants, their roles, and what they cost. |
 | `duet ping` | Check every participant's credentials and adapter. |
 | `duet config` | Print the resolved configuration. |

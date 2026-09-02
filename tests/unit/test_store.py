@@ -71,3 +71,47 @@ def test_list_sessions_and_artifacts(tmp_path: Path):
     assert ref == "artifacts/draft.md"
     assert (store.dir / "artifacts" / "draft.md").read_text() == "# spec"
     assert store.session_id in SessionStore.list_sessions(root=tmp_path)
+
+
+def test_label_prefers_the_draft_title_over_the_brief(tmp_path: Path):
+    """Participants name the thing they are designing far better than the
+    opening brief does — and a listing of bare uuids is unreadable."""
+    store = SessionStore.new(root=tmp_path)
+    store.append("state_change", {"to": "DESIGN_DEBATE", "brief": "something to track my reading"})
+    assert store.label() == "something to track my reading"
+
+    store.append("draft", {"round": 1, "markdown": "# CLI Reading Tracker\n\n## Problem"})
+    assert store.label() == "CLI Reading Tracker"
+
+    # The latest draft wins: titles change as the spec is revised.
+    store.append("draft", {"round": 2, "markdown": "# Readlog\n\n## Problem"})
+    assert store.label() == "Readlog"
+
+
+def test_label_is_shortened_and_survives_odd_input(tmp_path: Path):
+    store = SessionStore.new(root=tmp_path)
+    store.append("state_change", {"to": "DESIGN_DEBATE", "brief": "word " * 40})
+    assert len(store.label()) <= 34 and store.label().endswith("…")
+
+    bare = SessionStore.new(root=tmp_path)
+    assert bare.label() == ""  # nothing to say yet, rather than a crash
+
+    # A draft whose markdown has no heading falls back rather than mislabelling.
+    bare.append("state_change", {"to": "DESIGN_DEBATE", "brief": "a brief"})
+    bare.append("draft", {"round": 1, "markdown": "no heading here"})
+    assert bare.label() == "a brief"
+
+
+def test_sessions_are_listed_most_recent_first(tmp_path: Path):
+    import os
+    import time
+
+    older = SessionStore.new(root=tmp_path)
+    older.append("state_change", {"to": "DONE"})
+    time.sleep(0.01)
+    newer = SessionStore.new(root=tmp_path)
+    newer.append("state_change", {"to": "DONE"})
+
+    listed = SessionStore.list_sessions(root=tmp_path)
+    assert listed[0] == newer.session_id
+    assert listed.index(newer.session_id) < listed.index(older.session_id)

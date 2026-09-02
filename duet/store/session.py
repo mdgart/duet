@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import textwrap
 import uuid
 from pathlib import Path
 from typing import Any, Callable, Iterator
@@ -69,6 +70,26 @@ class SessionStore:
             + ", ".join(m[:12] for m in matches)
         )
 
+    def label(self, width: int = 34) -> str:
+        """What this session was about, in one line.
+
+        Prefers the latest draft's title, since the participants name the thing
+        they are designing far better than the opening brief does; falls back to
+        the brief for sessions that have not produced a draft yet. Without this
+        a listing is a wall of uuids and the only way to identify a session is
+        to open its files.
+        """
+        title = brief = ""
+        for event in self.events():
+            if event.type == "draft":
+                first = event.payload.get("markdown", "").lstrip().split("\n", 1)[0]
+                if first.startswith("#"):
+                    title = first.lstrip("#").strip()
+            elif event.type == "state_change" and event.payload.get("brief") and not brief:
+                brief = " ".join(event.payload["brief"].split())
+        text = title or brief
+        return textwrap.shorten(text, width, placeholder="…") if text else ""
+
     @property
     def owner(self) -> str:
         for event in self.events():
@@ -78,10 +99,16 @@ class SessionStore:
 
     @classmethod
     def list_sessions(cls, root: Path | None = None) -> list[str]:
+        """Session ids, most recently active first.
+
+        Sorting by id would be sorting by uuid, which is sorting by nothing —
+        and the session you want is almost always the one you just ran.
+        """
         base = root or duet_home() / "sessions"
         if not base.is_dir():
             return []
-        return sorted(p.name for p in base.iterdir() if (p / "log.jsonl").is_file())
+        logs = [p / "log.jsonl" for p in base.iterdir() if (p / "log.jsonl").is_file()]
+        return [p.parent.name for p in sorted(logs, key=lambda f: f.stat().st_mtime, reverse=True)]
 
     # -- event log ---------------------------------------------------------
 

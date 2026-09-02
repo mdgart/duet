@@ -14,7 +14,7 @@ from typing import Optional
 import typer
 from rich.console import Console
 from rich.markdown import Markdown
-from rich.table import Table
+from rich.table import Column, Table
 
 from duet import __version__
 from duet.orchestrator.debate import ContextTooLarge
@@ -330,7 +330,11 @@ def resume(
         console.print(f"[yellow]note[/]: {notice}")
     _live_view(cfg, store)
     machine = Machine(cfg, store, providers_for(cfg))
-    console.print(f"resuming [bold]{session_id}[/] from {machine.current_state()}")
+    label = store.label()
+    console.print(
+        f"resuming [bold]{session_id[:12]}[/] from {machine.current_state()}"
+        + (f" · {label}" if label else "")
+    )
     _drive(machine, store, cfg, actor, machine.advance())
 
 
@@ -414,18 +418,31 @@ def show_config(
 @app.command()
 def sessions():
     """List sessions with state and cost."""
-    table = Table("session", "owner", "events", "last state", "cost")
+    # One row per session: a wrapped label turns a listing you scan into one you
+    # have to read.
+    table = Table(
+        "session",
+        Column("about", no_wrap=True, overflow="ellipsis"),
+        "owner",
+        "state",
+        "cost",
+    )
     for sid in SessionStore.list_sessions():
         store = SessionStore(sid)
-        last_state, count = "-", 0
+        last_state = "-"
         for e in store.events():
-            count += 1
             if e.type == "state_change":
                 last_state = e.payload.get("to", "-")
+        style = {"DONE": "green", "FAILED": "red", "BUDGET_STOP": "yellow"}.get(last_state, "")
         # Short ids are enough to read and enough to resume: `duet resume`
         # accepts any unambiguous prefix.
-        table.add_row(sid[:12], store.owner or "[dim]anonymous[/]", str(count),
-                      last_state, f"${store.cost_usd:.4f}")
+        table.add_row(
+            sid[:12],
+            store.label() or "[dim]—[/]",
+            store.owner or "[dim]anonymous[/]",
+            f"[{style}]{last_state}[/]" if style else last_state,
+            f"${store.cost_usd:.4f}",
+        )
     console.print(table)
 
 
