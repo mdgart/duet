@@ -32,6 +32,7 @@ class GateRequest:
     artifacts: list[str]
     draft_hash: str
     objections: list[dict] = field(default_factory=list)
+    facts: dict = field(default_factory=dict)
 
 
 @dataclass
@@ -199,7 +200,14 @@ class Machine:
             log_ref = self.store.save_artifact("IMPLEMENTATION.md", result.state.draft_markdown)
             self._transition("GATE_1")
             return self._open_gate(
-                "gate_1", GATE_1_OPTIONS, [log_ref], result.state.draft_hash, result.detail
+                "gate_1",
+                GATE_1_OPTIONS,
+                [log_ref],
+                result.state.draft_hash,
+                result.detail,
+                # What the debate cost and settled, so the gate can be answered
+                # from a summary rather than by reading the whole spec.
+                facts=self._gate_facts(result.state),
             )
         if result.outcome == "BUDGET_STOP":
             self._transition("BUDGET_STOP")
@@ -234,6 +242,20 @@ class Machine:
             ],
         )
 
+    def _gate_facts(self, state) -> dict:
+        markdown = state.draft_markdown
+        closed = [e for e in state.ledger.entries if e.status != "open"]
+        return {
+            "rounds": state.round,
+            "cost_usd": round(self.store.cost_usd, 4),
+            "objections_raised": len(state.ledger.entries),
+            "objections_closed": len(closed),
+            "objections_open": len(state.ledger.open_entries()),
+            "assumptions": markdown.count("ASSUMPTION:"),
+            "fixed": markdown.count("FIXED:"),
+            "spec_chars": len(markdown),
+        }
+
     def _open_gate(
         self,
         gate: str,
@@ -242,10 +264,13 @@ class Machine:
         draft_hash: str,
         detail: str,
         objections: list[dict] | None = None,
+        facts: dict | None = None,
     ) -> RunResult:
         payload = {"gate": gate, "options": options, "artifacts": artifacts, "draft_hash": draft_hash}
         if objections:
             payload["objections"] = objections
+        if facts:
+            payload["facts"] = facts
         self.store.append("gate_pending", payload)
         return RunResult(
             self.current_state(), suspended=True, gate=GateRequest(**payload), detail=detail

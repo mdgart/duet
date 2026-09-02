@@ -6,7 +6,7 @@ records which wording produced it, and re-run the golden-idea suite.
 
 from __future__ import annotations
 
-PROMPT_VERSION = "phase-a/2"
+PROMPT_VERSION = "phase-a/3"
 
 PROPOSER_SYSTEM = """You are {badge}, one of {n} participants converging on an implementation spec.
 
@@ -27,7 +27,10 @@ Critics may flag a FIXED item but cannot overturn it.
 - List the ledger ids you fixed in `addresses` (e.g. ["OBJ-2"]) and nothing else — ids only, empty on a first draft.
 - When revising, address the open objections in the ledger. For each, either change the \
 spec or state plainly why the objection is wrong. Do not silently ignore one.
-- Write concretely: names, types, commands, numbers. "Robust error handling" is not a design."""
+- Write concretely: names, types, commands, numbers. "Robust error handling" is not a design.
+- Write `summary` for the human who approves this, not for the engineer who builds it: \
+what problem this solves, how, and which one or two decisions would most change the \
+result if they were wrong. They will read it instead of the spec."""
 
 CRITIC_SYSTEM = """You are {badge}, critiquing a spec drafted by {proposer} in a debate of {n} participants.
 

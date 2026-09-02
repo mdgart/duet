@@ -159,3 +159,27 @@ def test_unmarked_revision_feedback_still_gets_the_marker(tmp_path: Path):
     submit_gate_decision(store, action="revise", actor="mauro", feedback="must work offline")
     machine.advance()
     assert "FIXED: must work offline" in machine.brief()
+
+
+def test_the_disagreement_report_opens_with_what_it_is_about(tmp_path: Path):
+    """A report you must read in full to know whether to resolve or abort is a
+    report that gets aborted."""
+    from duet.orchestrator.arbitration import disagreement_report
+    from duet.orchestrator.ledger import ObjectionLedger
+    from duet.schemas.debate import Objection, Verdict
+
+    cfg = roster("sol", "opus")
+    ledger = ObjectionLedger()
+    ledger.merge_round(1, {"sol": Verdict(verdict="OBJECT", objections=[
+        Objection(severity="blocking", section="Architecture / endpoint control",
+                  claim="clock source is unspecified", evidence="e", proposed_change="p"),
+        Objection(severity="major", section="Architecture / endpoint control",
+                  claim="lease issuance has no freshness limit", evidence="e", proposed_change="p"),
+    ])})
+    report = disagreement_report(ledger, cfg.roster, "round cap", [2, 2], [(2, 0), (0, 0)])
+
+    head = report.split("## Was it converging?")[0]
+    assert "2 objection(s) still open, 1 of them blocking" in head
+    assert "held by sol" in head
+    assert "Architecture / endpoint control" in head
+    assert "one decision wearing several hats" in head

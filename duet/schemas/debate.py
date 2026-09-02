@@ -31,6 +31,24 @@ class SpecDraft(BaseModel):
     cannot quietly drop the parts it finds hard."""
 
     title: str
+    summary: str = Field(
+        default="",
+        description=(
+            "Three to five sentences a decision-maker reads in under a minute: the "
+            "problem being solved, the approach taken, and the one or two choices "
+            "that would most change the result if they were wrong. Plain prose, no "
+            "implementation detail, no bullet lists — the rest of the document is "
+            "the detail."
+        ),
+    )
+    """The human-facing half of the document.
+
+    The spec proper is written for whoever builds it and runs to tens of
+    thousands of characters; nobody approves that at a gate. This is what the
+    human actually reads before deciding, written by the participant that wrote
+    the spec, so it stays current with every revision at no extra cost.
+    """
+
     addresses: list[str] = Field(
         default_factory=list,
         description=(
@@ -60,6 +78,8 @@ class SpecDraft(BaseModel):
 
     def to_markdown(self) -> str:
         parts = [f"# {self.title}", ""]
+        if self.summary.strip():
+            parts += ["## In short", "", self.summary.strip(), ""]
         for field, heading in SPEC_SECTIONS:
             parts += [f"## {heading}", "", getattr(self, field).strip(), ""]
         return "\n".join(parts).rstrip() + "\n"

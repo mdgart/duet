@@ -42,7 +42,11 @@ def test_new_debates_then_approves_at_the_gate(monkeypatch, tmp_path: Path):
     assert "OBJECT" in result.output and "AGREE" in result.output
     assert "DESIGN_DEBATE → GATE_1" in result.output
     assert "DONE" in result.output
-    assert "Problem statement" in result.output  # the spec was rendered at the gate
+    # The gate shows the decision, not the build document: a summary and what
+    # the debate cost and settled.
+    assert "In short" in result.output
+    assert "objections settled" in result.output
+    assert "Problem statement" not in result.output, "the full spec should need `view`"
 
 
 def test_new_accepts_a_brief_file(monkeypatch, tmp_path: Path):
@@ -174,3 +178,21 @@ def test_budget_override_lifts_a_stop_without_editing_config(monkeypatch, tmp_pa
     lifted = runner.invoke(cli.app, ["resume", session_id, "--budget", "25"], input="approve\n")
     assert lifted.exit_code == 0, lifted.output
     assert "DONE" in lifted.output
+
+
+def test_view_pages_the_full_spec_then_asks_again(monkeypatch, tmp_path: Path):
+    """`view` is not a decision — the gate reopens after showing the document."""
+    stub(monkeypatch, tmp_path)
+    result = runner.invoke(cli.app, ["new", "an app"], input="view\napprove\n")
+
+    assert result.exit_code == 0, result.output
+    assert "Problem statement" in result.output  # the whole spec, on request
+    assert "DONE" in result.output
+
+
+def test_an_unrecognised_action_reprompts(monkeypatch, tmp_path: Path):
+    stub(monkeypatch, tmp_path)
+    result = runner.invoke(cli.app, ["new", "an app"], input="maybe\napprove\n")
+    assert result.exit_code == 0, result.output
+    assert "choose one of" in result.output
+    assert "DONE" in result.output

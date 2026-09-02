@@ -82,10 +82,29 @@ duet ping
 duet new "a CLI that tracks what I read"
 ```
 
-The debate streams live. At the gate you get the spec and four choices —
-**approve**, **edit** (opens `$EDITOR`), **revise** (send it back with
-feedback), or **reject**. The approved spec lands in
-`~/.duet/sessions/<id>/artifacts/IMPLEMENTATION.md`.
+The debate streams live. At the gate you get a summary written for the person
+deciding — the problem, the approach, and the choices that would most change the
+result if they were wrong — plus what the debate cost and settled:
+
+```
+──────────────── gate_1 · 2/2: haiku, mini ────────────────
+In short
+
+Engineers each run their own mix of AI tools, so nobody can say what is
+running where. This registers every tool centrally and enforces an
+allow-list on the endpoint. The decision that matters most is whether
+endpoint enforcement is a security boundary or a compliance signal.
+
+3 rounds · $0.0060 · 7/9 objections settled · 4 assumptions made for you
+full document: ~/.duet/sessions/<id>/artifacts/IMPLEMENTATION.md (24,758 chars)
+
+action (approve/edit/revise/reject/view):
+```
+
+`view` pages the full spec — which is written for whoever builds it and runs to
+tens of thousands of characters, so it is not what you read to decide.
+**approve** accepts it, **edit** opens `$EDITOR`, **revise** sends it back with
+feedback, **reject** ends the session.
 
 If the models cannot agree, you get a disagreement report instead: what each
 one still holds, whether the debate was converging, and a choice of **resolve**

@@ -303,17 +303,69 @@ def _wrap(text: str, width: int) -> list[str]:
     return _tw.wrap(text, width) or [""]
 
 
+def _spec_summary(markdown: str) -> str:
+    """The `## In short` section, if the proposer wrote one."""
+    marker = "\n## In short\n"
+    if marker not in markdown:
+        return ""
+    body = markdown.split(marker, 1)[1]
+    return body.split("\n## ", 1)[0].strip()
+
+
+def _show_gate(store: SessionStore, gate, detail: str) -> None:
+    """What the human needs to decide, not what the builder needs to build.
+
+    The spec runs to tens of thousands of characters because it is written for
+    whoever implements it. Paging all of that at a gate buries the decision, so
+    the default view is the proposer's own summary plus what the debate cost and
+    settled; `view` shows the document itself.
+    """
+    console.rule(f"[bold]{gate.gate}[/] · {detail}")
+    path = store.dir / gate.artifacts[0] if gate.artifacts else None
+    markdown = path.read_text() if path and path.is_file() else ""
+
+    summary = _spec_summary(markdown)
+    if summary:
+        console.print(Markdown(f"## In short\n\n{summary}"))
+    elif markdown:
+        console.print("[dim](the proposer wrote no summary — use `view` for the spec)[/]")
+
+    f = gate.facts
+    if f:
+        console.print(
+            f"[dim]{f['rounds']} rounds · ${f['cost_usd']:.4f} · "
+            f"{f['objections_closed']}/{f['objections_raised']} objections settled"
+            + (f", {f['objections_open']} still open" if f.get("objections_open") else "")
+            + f" · {f['assumptions']} assumptions made for you"
+            + (f", {f['fixed']} decisions of yours kept" if f.get("fixed") else "")
+            + "[/]"
+        )
+    if gate.objections:
+        console.print(f"[dim]unresolved:[/] " + ", ".join(
+            f"{o['id']} ({o['severity']}, held by {', '.join(o.get('held_by') or []) or '?'})"
+            for o in gate.objections
+        ))
+    if path:
+        console.print(f"[dim]full document: {path} ({len(markdown):,} chars)[/]")
+
+
 def _drive(machine: Machine, store: SessionStore, cfg: DuetConfig, actor: str, result) -> None:
     """Loop between the engine and the human until the session terminates."""
     while result.suspended:
         gate = result.gate
-        console.rule(f"[bold]{gate.gate}[/] · {result.detail}")
-        for ref in gate.artifacts:
-            _show_artifact(store, ref)
-        console.print(f"[dim]cost so far ${store.cost_usd:.4f}[/]")
-        action = typer.prompt(f"action ({'/'.join(gate.options)})")
-        while action not in gate.options:
-            action = typer.prompt(f"choose one of {', '.join(gate.options)}")
+        _show_gate(store, gate, result.detail)
+
+        # `view` is not a decision — it pages the document and asks again.
+        choices = gate.options + ["view"]
+        action = typer.prompt(f"action ({'/'.join(choices)})")
+        while action not in choices:
+            action = typer.prompt(f"choose one of {', '.join(choices)}")
+        while action == "view":
+            for ref in gate.artifacts:
+                _show_artifact(store, ref)
+            action = typer.prompt(f"action ({'/'.join(choices)})")
+            while action not in choices:
+                action = typer.prompt(f"choose one of {', '.join(choices)}")
         feedback = ""
         if action == "resolve":
             feedback = _collect_rulings(gate)

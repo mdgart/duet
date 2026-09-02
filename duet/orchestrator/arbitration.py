@@ -72,6 +72,26 @@ def disagreement_report(
     serves a pair and a panel.
     """
     lines = ["# Disagreement report", "", f"Debate ended: {detail}", ""]
+    open_entries_early = ledger.open_entries()
+    if open_entries_early:
+        holders = sorted({p for e in open_entries_early for p in set(e.raised_by) - set(e.closed_by)})
+        sections = sorted({e.section for e in open_entries_early})
+        blocking = sum(1 for e in open_entries_early if e.severity == "blocking")
+        lines += [
+            "## In short",
+            "",
+            f"{len(open_entries_early)} objection(s) still open"
+            + (f", {blocking} of them blocking" if blocking else "")
+            + f" — held by {', '.join(holders)}.",
+            "",
+            "They sit in: " + "; ".join(s[:70] for s in sections[:4])
+            + (" …" if len(sections) > 4 else "") + ".",
+            "",
+            "Objections clustered in one area are usually one decision wearing several "
+            "hats. Read them together before ruling on each: a single ruling that "
+            "removes or settles the shared cause often closes all of them.",
+            "",
+        ]
     lines += convergence_trend(open_history or [], churn)
     open_entries = ledger.open_entries()
     if not open_entries:

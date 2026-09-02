@@ -52,7 +52,12 @@ def parsed(obj: BaseModel, model_id: str = "fake", cost: float = 0.001) -> Model
 def spec(title: str, addresses: list[str] | None = None) -> SpecDraft:
     """A complete draft. The title varies the content hash between revisions."""
     body = {f: f"{title} — {heading}" for f, heading in _SECTIONS}
-    return SpecDraft(title=title, addresses=addresses or [], **body)
+    return SpecDraft(
+        title=title,
+        summary=f"{title} solves the stated problem with the smallest design that fits.",
+        addresses=addresses or [],
+        **body,
+    )
 
 
 _SECTIONS = [
