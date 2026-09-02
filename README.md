@@ -113,10 +113,12 @@ objection with space for your decision on each; those become `FIXED:` items the
 models must accept, and the debate resumes with a raised round cap. Objections
 you leave blank come back.
 
-Longer briefs come from a file, and background material from `--context`:
+The argument is the idea itself, or `@path` to read it from a file. Background
+material comes from `--context`, which is repeatable. Both accept `~`:
 
 ```bash
-duet new "@brief.md" --context docs/architecture.md --context docs/conventions.md
+duet new "a CLI that tracks what I read"
+duet new "@~/notes/brief.md" --context docs/architecture.md --context docs/conventions.md
 ```
 
 The **brief** is what you want built and the debate revises it. **Context** is

@@ -196,3 +196,32 @@ def test_an_unrecognised_action_reprompts(monkeypatch, tmp_path: Path):
     assert result.exit_code == 0, result.output
     assert "choose one of" in result.output
     assert "DONE" in result.output
+
+
+def test_a_brief_path_may_use_a_tilde(monkeypatch, tmp_path: Path):
+    """`~` survives quoting where the shell's own expansion does not, and
+    "@~/notes/brief.md" is what people type."""
+    stub(monkeypatch, tmp_path)
+    home = tmp_path / "home"
+    (home / "notes").mkdir(parents=True)
+    (home / "notes" / "brief.md").write_text("a link-saving app, offline first")
+    monkeypatch.setenv("HOME", str(home))
+
+    result = runner.invoke(cli.app, ["new", "@~/notes/brief.md"], input="approve\n")
+    assert result.exit_code == 0, result.output
+    assert "DONE" in result.output
+
+
+def test_a_missing_brief_file_says_so_instead_of_crashing(monkeypatch, tmp_path: Path):
+    stub(monkeypatch, tmp_path)
+    result = runner.invoke(cli.app, ["new", f"@{tmp_path}/absent.md"])
+    assert result.exit_code == 1
+    assert "brief file not found" in result.output
+
+
+def test_a_context_path_may_use_a_tilde(monkeypatch, tmp_path: Path):
+    home = tmp_path / "home"
+    home.mkdir()
+    (home / "CTX.md").write_text("Postgres 16 is already deployed.")
+    monkeypatch.setenv("HOME", str(home))
+    assert "Postgres 16" in cli._load_context([Path("~/CTX.md")])

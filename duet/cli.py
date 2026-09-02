@@ -98,6 +98,22 @@ class _Ticking:
 DEFAULT_CONTEXT = Path("CONTEXT.md")
 
 
+def _read_brief(idea: str) -> str:
+    """The idea itself, or `@path` to read it from a file.
+
+    `~` is expanded here rather than left to the shell: it survives quoting,
+    which the shell's own expansion does not, and "@~/notes/brief.md" is what
+    people type.
+    """
+    if not idea.startswith("@"):
+        return idea
+    path = Path(idea[1:]).expanduser()
+    if not path.is_file():
+        console.print(f"[red]brief file not found: {path}[/]")
+        raise typer.Exit(code=1)
+    return path.read_text()
+
+
 def _load_context(paths: list[Path]) -> str:
     """Reference material for every model at every stage.
 
@@ -106,7 +122,9 @@ def _load_context(paths: list[Path]) -> str:
     literal text: no URL in them is ever fetched, which would put network in
     the orchestrator and make every link an injection vector.
     """
-    chosen = list(paths) or ([DEFAULT_CONTEXT] if DEFAULT_CONTEXT.is_file() else [])
+    chosen = [p.expanduser() for p in paths] or (
+        [DEFAULT_CONTEXT] if DEFAULT_CONTEXT.is_file() else []
+    )
     if not chosen:
         console.print("[dim]no context file (looked for ./CONTEXT.md)[/]")
         return ""
@@ -403,7 +421,7 @@ def new(
 ):
     """Start a session: debate an idea into an approved spec (Phase A)."""
     cfg = _budgeted(load_config(config_path, profile), budget)
-    brief = Path(idea[1:]).read_text() if idea.startswith("@") else idea
+    brief = _read_brief(idea)
     context = _load_context(context_paths)
     store = SessionStore.new(owner=actor)
     console.print(f"session [bold]{store.session_id}[/] · {len(cfg.participants)} participants")
