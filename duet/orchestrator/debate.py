@@ -23,7 +23,8 @@ from duet.prompts.phase_a import (
 )
 from duet.providers.base import OutputTruncated, Provider
 from duet.schemas.config import DuetConfig, Participant
-from duet.schemas.debate import SpecDraft, Verdict
+from duet.schemas.debate import Verdict
+from duet.schemas.templates import Template, draft_model_for, get_template
 from duet.schemas.model_io import ModelRequest, Turn
 from duet.store.session import BudgetExceeded, SessionStore
 
@@ -94,12 +95,15 @@ class DebateEngine:
         store: SessionStore,
         providers: dict[str, Provider],
         context: str = "",
+        template: Template | str = "software",
     ):
         self.config = config
         self.store = store
         self.providers = providers
         self.roster = config.roster
         self.context = context
+        self.template = template if isinstance(template, Template) else get_template(template)
+        self.draft_model = draft_model_for(self.template)
         self.check_context(config, context)
 
     @classmethod
@@ -121,6 +125,7 @@ class DebateEngine:
         store: SessionStore,
         providers: dict[str, Provider],
         context: str = "",
+        template: Template | str = "software",
     ):
         """Rebuild debate state from the log. Resume is replay plus continue.
 
@@ -128,7 +133,7 @@ class DebateEngine:
         the proposer's closures land before that round's critiques, exactly as
         they did live, so a resumed ledger is identical to the original.
         """
-        engine = cls(config, store, providers, context=context)
+        engine = cls(config, store, providers, context=context, template=template)
         state = DebateState()
         rounds: dict[int, dict] = {}
         for event in store.events():
@@ -309,7 +314,9 @@ class DebateEngine:
     # -- turns -------------------------------------------------------------
 
     def _propose(self, state: DebateState, brief: str, proposer: Participant) -> SpecDraft:
-        system = PROPOSER_SYSTEM.format(badge=proposer.badge, n=len(self.roster))
+        system = PROPOSER_SYSTEM.format(
+            badge=proposer.badge, n=len(self.roster), noun=self.template.noun
+        )
         user = proposer_messages(
             brief=brief,
             draft_markdown=state.draft_markdown or None,
@@ -318,7 +325,7 @@ class DebateEngine:
             context=self.context,
             your_open=_own_open_lines(state, proposer.id),
         )
-        draft = self._call(proposer, system, user, SpecDraft, "propose", state.round)
+        draft = self._call(proposer, system, user, self.draft_model, "propose", state.round)
         closed = state.ledger.close_for(proposer.id, draft.addresses)
         markdown = draft.to_markdown()
         log_ref = self.store.save_artifact(
@@ -345,6 +352,7 @@ class DebateEngine:
             badge=critic.badge,
             proposer=proposer_badge,
             n=len(self.roster),
+            noun=self.template.noun,
             agree_rule=AGREE_FORBIDDEN if floor else AGREE_ALLOWED,
         )
         user = critic_messages(

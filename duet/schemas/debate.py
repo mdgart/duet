@@ -2,92 +2,32 @@
 
 from __future__ import annotations
 
-import hashlib
 import re
 import textwrap
 from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from duet.schemas.templates import (  # noqa: F401 — re-exported
+    DEFAULT_TEMPLATE,
+    TEMPLATES,
+    DraftBase,
+    Section,
+    Template,
+    all_headings,
+    draft_model_for,
+    get_template,
+)
+
 Severity = Literal["blocking", "major", "minor"]
 VerdictKind = Literal["AGREE", "REVISE", "OBJECT"]
 SEVERITY_RANK: dict[str, int] = {"minor": 0, "major": 1, "blocking": 2}
 
-# SPECS §4.2 — the fixed skeleton every draft must fill.
-SPEC_SECTIONS: tuple[tuple[str, str], ...] = (
-    ("problem_statement", "Problem statement"),
-    ("goals_non_goals", "Goals / Non-goals"),
-    ("user_facing_behavior", "User-facing behavior"),
-    ("architecture", "Architecture & key components"),
-    ("data_model", "Data model"),
-    ("external_dependencies", "External dependencies"),
-    ("milestones", "Task-level milestones"),
-    ("acceptance_criteria", "Acceptance criteria"),
-    ("open_questions", "Open questions"),
-)
-
-
-class SpecDraft(BaseModel):
-    """A full implementation spec. Every section is required, so a proposer
-    cannot quietly drop the parts it finds hard."""
-
-    title: str
-    summary: str = Field(
-        default="",
-        description=(
-            "Three to five sentences a decision-maker reads in under a minute: the "
-            "problem being solved, the approach taken, and the one or two choices "
-            "that would most change the result if they were wrong. Plain prose, no "
-            "implementation detail, no bullet lists — the rest of the document is "
-            "the detail."
-        ),
-    )
-    """The human-facing half of the document.
-
-    The spec proper is written for whoever builds it and runs to tens of
-    thousands of characters; nobody approves that at a gate. This is what the
-    human actually reads before deciding, written by the participant that wrote
-    the spec, so it stays current with every revision at no extra cost.
-    """
-
-    addresses: list[str] = Field(
-        default_factory=list,
-        description=(
-            "Objection ids from the ledger that this revision fixes, e.g. "
-            '["OBJ-2", "OBJ-5"]. Ids only — no prose, no summaries. Empty list '
-            "on a first draft, when no objections exist yet."
-        ),
-    )
-    """Objection ids this revision claims to fix. A proposer can only close
-    objections it raised itself (see ObjectionLedger.close_for) — claiming to
-    have fixed someone else's is for them to judge, not the author.
-
-    The description above reaches the model: structured-output modes require
-    every field to be emitted, so an unexplained field gets filled with
-    whatever the model guesses it means.
-    """
-
-    problem_statement: str
-    goals_non_goals: str
-    user_facing_behavior: str
-    architecture: str
-    data_model: str
-    external_dependencies: str
-    milestones: str
-    acceptance_criteria: str
-    open_questions: str
-
-    def to_markdown(self) -> str:
-        parts = [f"# {self.title}", ""]
-        if self.summary.strip():
-            parts += ["## In short", "", self.summary.strip(), ""]
-        for field, heading in SPEC_SECTIONS:
-            parts += [f"## {heading}", "", getattr(self, field).strip(), ""]
-        return "\n".join(parts).rstrip() + "\n"
-
-    def content_hash(self) -> str:
-        """Pins the exact text a verdict was cast against (SPECS §4.3)."""
-        return hashlib.sha256(self.to_markdown().encode()).hexdigest()[:12]
+# The software template's generated model. Kept under its familiar name because
+# it is the default shape and what the contract and golden suites exercise; a
+# debate uses whatever template its session selected (draft_model_for).
+SpecDraft = draft_model_for(get_template("software"))
+SPEC_SECTIONS = get_template("software").pairs()
 
 
 class Objection(BaseModel):
@@ -138,7 +78,7 @@ class Verdict(BaseModel):
     agreement_score: float = Field(default=0.0, ge=0.0, le=1.0)
 
 
-CANONICAL_SECTIONS = tuple(heading for _, heading in SPEC_SECTIONS)
+CANONICAL_SECTIONS = all_headings()
 
 
 def canonical_section(section: str) -> str:

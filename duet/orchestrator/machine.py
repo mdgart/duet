@@ -69,6 +69,13 @@ class Machine:
                 return [Participant.model_validate(p) for p in event.payload["roster"]]
         return []
 
+    def template(self) -> str:
+        """The document shape this session was started with (SPECS §4.2)."""
+        for event in self.store.events():
+            if event.type == "state_change" and event.payload.get("template"):
+                return event.payload["template"]
+        return "software"
+
     def context(self) -> str:
         """Reference material for the session, fixed at creation.
 
@@ -113,13 +120,17 @@ class Machine:
 
     # -- driving -----------------------------------------------------------
 
-    def start(self, brief: str, context: str = "") -> RunResult:
+    def start(self, brief: str, context: str = "", template: str = "software") -> RunResult:
         DebateEngine.check_context(self.config, context)
         # The roster is pinned to the session, not re-read from config on
         # resume. Only the participant who raised an objection may close it, so
         # swapping the roster mid-debate orphans every open objection: the new
         # participants cannot resolve them and the debate can only deadlock.
-        payload = {"brief": brief, "roster": [p.model_dump() for p in self.config.participants]}
+        payload = {
+            "brief": brief,
+            "template": template,
+            "roster": [p.model_dump() for p in self.config.participants],
+        }
         if context.strip():
             # Stored inline for faithful replay and as a file for reading.
             payload["context"] = context
@@ -140,7 +151,8 @@ class Machine:
             return RunResult(state, detail=f"cannot review from {state}")
 
         engine = DebateEngine.replay(
-            self.config, self.store, self.providers, context=self.context()
+            self.config, self.store, self.providers,
+            context=self.context(), template=self.template(),
         )
         result = engine.review(self.brief(), engine.state, markdown, author)
 
@@ -189,7 +201,8 @@ class Machine:
 
     def _run_debate(self) -> RunResult | None:
         engine = DebateEngine.replay(
-            self.config, self.store, self.providers, context=self.context()
+            self.config, self.store, self.providers,
+            context=self.context(), template=self.template(),
         )
         cap = self.config.debate.max_rounds + self.round_cap_bonus()
         engine.config = self.config.model_copy(deep=True)

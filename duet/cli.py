@@ -18,6 +18,7 @@ from rich.table import Column, Table
 
 from duet import __version__
 from duet.orchestrator.debate import ContextTooLarge
+from duet.schemas.templates import TEMPLATES, get_template
 from duet.orchestrator.machine import Machine, pin_roster, providers_for, submit_gate_decision
 from duet.providers.base import build_provider
 from duet.schemas.config import DuetConfig, Participant, load_config
@@ -416,6 +417,10 @@ def _drive(machine: Machine, store: SessionStore, cfg: DuetConfig, actor: str, r
 @app.command()
 def new(
     idea: str = typer.Argument(..., help="Idea text, or @path/to/a/file.md"),
+    template: str = typer.Option(
+        "software", "--template", "-t",
+        help="Document shape: software | decision | design (see `duet templates`)",
+    ),
     context_paths: list[Path] = typer.Option(
         [], "--context", help="Reference material; repeatable. Defaults to ./CONTEXT.md"
     ),
@@ -434,7 +439,12 @@ def new(
     _live_view(cfg, store)
     machine = Machine(cfg, store, providers_for(cfg))
     try:
-        result = machine.start(brief, context=context)
+        get_template(template)  # fail fast on a bad name, before spending
+    except ValueError as e:
+        console.print(f"[red]{e}[/]")
+        raise typer.Exit(code=1)
+    try:
+        result = machine.start(brief, context=context, template=template)
     except ContextTooLarge as e:
         console.print(f"[red]context too large[/]: {e}")
         raise typer.Exit(code=1)
@@ -515,6 +525,17 @@ def review(
         console.print(f"[red]{result.state}[/] · {result.detail}")
         raise typer.Exit(code=1)
     _drive(machine, store, cfg, actor, result)
+
+
+@app.command()
+def templates():
+    """List the document shapes a debate can produce."""
+    table = Table("template", "produces", "when to use")
+    for t in TEMPLATES.values():
+        marker = " [dim](default)[/]" if t.name == "software" else ""
+        table.add_row(f"{t.name}{marker}", t.label, t.when)
+    console.print(table)
+    console.print("[dim]pick one with `duet new \"...\" --template <name>`[/]")
 
 
 @app.command()

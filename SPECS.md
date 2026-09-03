@@ -93,7 +93,9 @@ Two consequences worth stating plainly rather than discovering later. Corroborat
 
 ### 4.2 Proposer output — spec draft
 
-Markdown, fixed section skeleton (enforced by structured output wrapper):
+Markdown, filling the section skeleton of the session's **template** (enforced by structured output). The template is chosen at `duet new --template` and fixed for the session; `software` (the default) is the implementation-spec skeleton below, and `decision` and `design` supply their own sections for non-code debates. The debate protocol is identical across templates — only the section set and the document's noun change. The structured-output model is generated per template, so every section is a required field the proposer cannot silently drop.
+
+The software skeleton:
 
 `Problem statement · Goals / Non-goals · User-facing behavior · Architecture & key components · Data model · External dependencies · Task-level milestones · Acceptance criteria · Open questions`
 

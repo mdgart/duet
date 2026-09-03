@@ -1,7 +1,8 @@
 # duet
 
-Turn an idea into an implementation spec by making two frontier models from
-different labs argue about it until they agree.
+Turn an idea into a well-examined document — an implementation spec, a decision
+record, a design brief — by making two frontier models from different labs argue
+about it until they agree.
 
 One model drafts a spec. A model from a *different* lab critiques it with
 structured objections. Roles rotate, objections are tracked in a ledger, and the
@@ -121,6 +122,20 @@ duet new "a CLI that tracks what I read"
 duet new "@~/notes/brief.md" --context docs/architecture.md --context docs/conventions.md
 ```
 
+Not every idea is software. `--template` chooses the shape of the document the
+debate produces:
+
+```bash
+duet new "should we adopt trunk-based development?" --template decision
+duet new "a company onboarding process for new engineers" --template design
+duet templates   # list the shapes and when to use each
+```
+
+`software` (the default) yields an implementation spec; `decision` a decision
+record with options, recommendation and consequences; `design` a general design
+brief. Every template debates through the same protocol — only the sections
+differ.
+
 The **brief** is what you want built and the debate revises it. **Context** is
 what is already true — existing systems, constraints, decisions — and the models
 must treat it as settled rather than argue with it. Context is read as literal
@@ -134,6 +149,7 @@ text; no URL in it is ever fetched.
 | `duet resume <id>` | Continue a suspended session. Any unambiguous id prefix works. |
 | `duet review <id>` | Put an edited spec back to the models for one critique round. |
 | `duet sessions` | List sessions — what each was about, owner, state and cost, newest first. |
+| `duet templates` | List the document shapes (software, decision, design). |
 | `duet roster` | Show participants, their roles, and what they cost. |
 | `duet ping` | Check every participant's credentials and adapter. |
 | `duet config` | Print the resolved configuration. |
