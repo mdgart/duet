@@ -1,10 +1,14 @@
-# Duet — Cross-Model Prototyping & Coding Agent Loop
+# Duet — Cross-Model Debate for Designs, Decisions & Code
 
-**Project Plan · v0.3 · 2026-08-29**
+**Project Plan · v0.4 · 2026-09-03**
+
+*v0.4: Phase A shipped and, in use, proved to be an idea-examination tool, not only a spec generator. The debate now produces the document shape that suits the idea — an implementation spec, a decision record, or a design brief (SPECS §4.2) — and the next milestone is the web UI (§6), brought forward ahead of Phase B because the terminal is the wrong surface for reading a debate.*
 
 ## 1. Vision
 
-A CLI tool that takes an idea — anywhere from a vague vision to a precise implementation brief — and drives it to a working prototype or complete feature through a structured adversarial loop between models from different labs (the small model of each by default — `--profile flagship` for the frontier pair; every model is configurable). One model proposes, the others critique and counter-propose, until they converge. A human approves at two hard gates: the agreed implementation spec, and the final code.
+A tool that takes an idea — anywhere from a vague vision to a precise brief — and drives it to a well-examined document through a structured adversarial loop between models from different labs (the small model of each by default — `--profile flagship` for the frontier pair; every model is configurable). One model proposes, the others critique and counter-propose, until they converge. A human approves the result at a hard gate.
+
+The document's shape follows the idea: an implementation spec for software to be built, a decision record for a choice to be made, a design brief for a system to design (SPECS §4.2). When the idea is software, an approved spec is the input to a second phase that writes the code (Phase B, not yet built) behind a second gate. Duet began as a coding tool and remains an excellent one, but in use it is a general instrument for reaching a decision two independent minds have stress-tested.
 
 Why cross-lab pairing: models from different labs have decorrelated blind spots and training biases. A GPT proposal reviewed by Claude (and vice versa) catches errors that same-model self-review reliably misses, and the disagreement signal itself is informative — persistent disagreement usually marks a real design risk worth surfacing to the human.
 
@@ -12,9 +16,9 @@ Why cross-lab pairing: models from different labs have decorrelated blind spots 
 
 ## 2. Core Loop (two phases, same protocol)
 
-**Phase A — Design convergence.** Idea → one participant drafts an implementation spec → every other participant critiques it independently with structured objections → the next participant in the rotation revises or rebuts → repeat until enough participants emit an explicit AGREE verdict on the same draft (all of them by default; a configurable quorum for larger rosters), or max rounds hit → human arbitrates. Output: an agreed `IMPLEMENTATION.md`. **Human gate 1: approve / edit / reject the spec.**
+**Phase A — Design convergence.** Idea → one participant drafts the document (its shape set by the session's template — spec, decision record, or design brief) → every other participant critiques it independently with structured objections → the next participant in the rotation revises or rebuts → repeat until enough participants emit an explicit AGREE verdict on the same draft (all of them by default; a configurable quorum for larger rosters), or max rounds hit → human arbitrates. Output: an agreed `IMPLEMENTATION.md`. **Human gate 1: approve / edit / revise / reject.**
 
-**Phase B — Build convergence.** One participant takes the coder role and implements the spec task-by-task in a sandboxed workspace (new project or existing repo). Every other participant reviews each change independently: runs tests, reads diffs, files structured findings (bug / spec-violation / style). The coder fixes the union of their findings; a task advances only when every reviewer signs off and tests pass. Which participant codes is configurable and can rotate per task. **Human gate 2: approve the working prototype / feature diff.**
+**Phase B — Build convergence.** *(Not yet built; the design below is the plan.)* One participant takes the coder role and implements the spec task-by-task in a sandboxed workspace (new project or existing repo). Every other participant reviews each change independently: runs tests, reads diffs, files structured findings (bug / spec-violation / style). The coder fixes the union of their findings; a task advances only when every reviewer signs off and tests pass. Which participant codes is configurable and can rotate per task. **Human gate 2: approve the working prototype / feature diff.**
 
 The two phases share one protocol: propose → critique → revise → verdict, with round caps, convergence detection, and human escalation on deadlock. This is the central abstraction of the codebase, and it is written against a roster of N — one author, everyone else adversarial — so the same engine serves a pair today and a cross-validating panel later.
 
@@ -83,6 +87,8 @@ Two requirements here exist for V2's sake and are cheap only now, while there is
 
 *Exit: a vague one-line idea produces an agreed, human-approved spec within the round cap on 3 test ideas, with the state machine passing its scripted tests at rosters of both 2 and 3; a session suspended at Gate 1 resumes correctly in a separate process from the one that started it.* **Met.** Scripted tests pass at N = 2 and N = 3, cross-process resume is verified, the contract suite passes against both providers live, and the golden suite converges on all three briefs within the round cap.
 
+Beyond the original scope, real use drove several additions now part of M1: `--context` files supplied to every participant at every stage; per-participant reference material treated as fixed, not debatable; a decision-sized summary and one-line objection headlines so a gate can be judged without reading the whole document; convergence and objection-churn reporting that distinguishes a debate making progress from one manufacturing it; `duet review` to put an edited document back for one critique round; a budget stop that suspends and resumes rather than ending; and document templates (SPECS §4.2) so the debate is not confined to software. The prompt set is at `phase-a/5`; the golden suite is the regression baseline for changing it.
+
 Getting there took one prompt change worth recording, because it inverted an assumption. Under `phase-a/1` the *most constrained* brief was the one that failed — deadlocked at the round cap while both vaguer briefs converged in three rounds. The cause was not difficulty but scope: the proposer was told to fill every section and write concretely, with nothing pulling the other way, so it invented subsystems the brief never asked for, and each invention became surface for the critics. Critics then compounded it, since every objection was "this is underspecified", which pushes the proposer to specify *more*. `phase-a/2` adds a minimality rule to the proposer and a scope-before-detail rule to the critic — if a component is not required, the objection is that it exists, not that it is thin.
 
 | brief | phase-a/1 | phase-a/2 |
@@ -101,7 +107,7 @@ Specs came out roughly half the size and denser — the long versions were infla
 
 **M5 — Cross-validation panels (post-v1).** Tune what M0–M4 already permit: prompts that read well with several critics, a live view that shows N streams without becoming soup, quorum defaults measured against unanimity, cheap-screening tiers so a panel does not cost N× a pair, and measurement of whether same-lab participants produce correlated objections (SPECS §13.5) — which can only be measured here, since corroboration does not exist at N = 2. No structural work is expected here — if this milestone needs a refactor, the N-openness built in M0 failed and that is worth knowing early.
 
-Build order note: M1 is usable alone (spec generator) — ship value before M2 exists.
+Build order, as it actually went: M1 shipped and is usable alone. Using it revealed two things — that the output is a document of many kinds, not only a spec (addressed by templates, SPECS §4.2), and that reading a ten-objection debate in a terminal is genuinely hard. So the next milestone is **the web UI (§6, W1–W2)**, brought forward ahead of Phase B: the groundwork (gates as events, log as projection, per-turn summaries and one-line objection headlines) is already in place, so it is mostly new surface rather than new engine. Phase B follows for the software case.
 
 ## 6. V2 — Web UI, Ideation, MCP
 

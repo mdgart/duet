@@ -1,9 +1,10 @@
 # Duet — Technical Specification
 
-**v0.3 · 2026-08-29 · companion to PLAN.md**
+**v0.4 · 2026-09-03 · companion to PLAN.md**
 
 *v0.2: the two-model pair generalised to an N-participant roster — participants, provider registry, proposer rotation, consensus thresholds, reviewer sets (§1, §3, §4.1, §4.3, §5.3, §5.6, §9).*
 *v0.3: gates become a suspend/resume event exchange and providers gain streaming, so the CLI is one gate client among several (§2, §3, §6.0, §10) — groundwork for the V2 web UI and MCP server in PLAN §6.*
+*v0.4: Phase A output is a template-shaped document, not only a software spec (§4.2); objections carry one-line headlines and gates a decision-sized summary (§4.3, §6.1); the CLI surface is brought current (§8).*
 
 ## 1. Definitions
 
@@ -13,7 +14,7 @@
 - **Roster**: the ordered list of participants (`[[participants]]` in config). Length ≥ 2; two is the default, not a structural limit. Every protocol below is defined for N and degenerates to the familiar pairwise form at N = 2.
 - **Debate**: a bounded propose/critique/revise exchange among the roster, ending in consensus, deadlock, or budget stop.
 - **Verdict**: a structured JSON block every critique turn must end with (schema §4.3).
-- **Gate**: a blocking human decision point. Gate 1 = spec approval, Gate 2 = code approval. Nothing crosses a gate without explicit human input.
+- **Gate**: a blocking human decision point. Gate 1 = document approval (the agreed spec / decision record / design brief), Gate 2 = code approval (Phase B, software only). Nothing crosses a gate without explicit human input.
 - **Coder / Reviewers**: Phase B roles. One coder per task; every other participant reviews unless `build.reviewers` narrows the set. Assignment is configurable and optionally rotates per task.
 
 ## 2. State Machine
@@ -223,14 +224,18 @@ Docker container per session: repo branch checkout mounted at `/work`, resource-
 ## 8. CLI
 
 ```
-duet new "idea text or @brief.md" [--repo PATH] [--profile NAME]
-duet resume <session-id>
-duet sessions                      # list, with state + cost
-duet replay <session-id>           # re-render debate + build log
-duet roster                        # participants, resolved roles, per-model price
-duet config [--edit]
-duet ping                          # connectivity + cost check across the roster
+duet new "<idea>|@brief.md" [--template software|decision|design]
+                            [--context PATH ...] [--profile NAME] [--budget USD]
+duet resume <id>            # continue a suspended session; any id prefix works
+duet review <id>           # put an edited document back for one critique round
+duet sessions              # list — what each was about, owner, state, cost
+duet roster                # participants, resolved roles, per-model price
+duet templates             # the document shapes and when to use each
+duet config                # print resolved configuration
+duet ping                  # connectivity + cost check across the roster
 ```
+
+`--budget` overrides `budget.max_usd`, which is how a budget-stopped session is resumed with more headroom (§7.2). `replay` (`duet replay`) and existing-repo `--repo` are M2/M4 and not yet implemented.
 
 Live view (`rich`): left-gutter participant badges from the roster (`[SOL]` cyan, `[OPUS]` orange, and whatever else is configured — `badge` and `color` are per-participant config, defaulting to the uppercased id), streaming text, verdict blocks rendered as tables, persistent status bar: `state · round · proposer · task k/n · $cost / $cap`. Concurrent critic and reviewer turns stream into per-participant panes.
 

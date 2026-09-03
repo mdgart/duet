@@ -26,17 +26,19 @@ attention.
 
 ## Status
 
-**Phase A (idea → spec) works.** Phase B (spec → code) is not built yet.
+**Phase A (idea → agreed document) works.** Phase B (spec → code) is not built yet.
 
 | | |
 |---|---|
-| Idea → agreed `IMPLEMENTATION.md`, with human approval gate | ✅ |
+| Idea → agreed document, with a human approval gate | ✅ |
+| Document shapes: implementation spec, decision record, design brief | ✅ |
 | OpenAI + Anthropic adapters, any number of participants | ✅ |
-| Resumable sessions, cost tracking, budget caps | ✅ |
-| Spec → working code in a sandbox (Phase B) | ⬜ next |
-| Web UI, MCP server, ideation phase | ⬜ [planned](PLAN.md#6-v2--web-ui-ideation-mcp) |
+| Resumable sessions, cost tracking, budget caps that suspend not end | ✅ |
+| Web UI to read and approve debates in a browser | ⬜ next ([plan](PLAN.md#6-v2--web-ui-ideation-mcp)) |
+| Spec → working code in a sandbox (Phase B) | ⬜ after the UI |
+| MCP server, ideation phase | ⬜ [planned](PLAN.md#6-v2--web-ui-ideation-mcp) |
 
-Three test suites: 110 unit/e2e tests, 16 contract tests against live provider
+Three test suites: 129 unit/e2e tests, 16 contract tests against live provider
 APIs, and a golden suite that runs three real debates end to end.
 
 ## Install
@@ -217,7 +219,7 @@ you interrupt a run.
 ## Development
 
 ```bash
-uv run --extra dev pytest                              # 110 unit + e2e tests
+uv run --extra dev pytest                              # 129 unit + e2e tests
 DUET_CONTRACT=1 uv run --extra dev pytest tests/contract   # live API, ~cents
 DUET_GOLDEN=1 uv run --extra dev pytest tests/golden -s    # 3 real debates, ~30c
 ```
