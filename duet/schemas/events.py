@@ -21,6 +21,7 @@ EventType = Literal[
     "gate_pending",
     "gate_decision",
     "commit",
+    "budget",
     "cost_tick",
     "error",
 ]

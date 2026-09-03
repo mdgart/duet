@@ -47,6 +47,7 @@ async function openSession(id) {
   $("#summary").replaceChildren();
   $("#gate").replaceChildren();
   seen.clear();
+  switchTab("debate");
   await refresh();
   loadSessions();
   connect(id);
@@ -58,8 +59,85 @@ async function refresh() {
   renderHead(snap);
   renderSummary(snap);
   renderGate(snap);
-  $("#document").textContent = snap.document || "(no document yet)";
+  renderDocument(snap.document || "");
 }
+
+// -- document page: render the agreed document, with a section jump-list ----
+
+function renderDocument(md) {
+  const doc = $("#doc"), nav = $("#doc-nav");
+  doc.replaceChildren(); nav.replaceChildren();
+  if (!md) { doc.append(el("p", "empty", "No document yet — it appears once the models draft one.")); return; }
+  const { nodes, sections } = markdownToNodes(md);
+  nodes.forEach((n) => doc.append(n));
+  if (sections.length > 2) {
+    for (const sec of sections) {
+      const a = el("a", "doc-link", sec.text);
+      a.href = "#" + sec.id;
+      a.onclick = (e) => { e.preventDefault(); document.getElementById(sec.id).scrollIntoView({ behavior: "smooth" }); };
+      nav.append(a);
+    }
+  }
+}
+
+// A small, safe markdown renderer — enough for these documents (headings,
+// paragraphs, lists, inline `code` and **bold**). Text is set via textContent,
+// so nothing in the document can inject markup.
+function markdownToNodes(md) {
+  const nodes = [], sections = [];
+  const lines = md.replace(/\r/g, "").split("\n");
+  let list = null, para = [];
+  const flushPara = () => { if (para.length) { nodes.push(inline(el("p"), para.join(" "))); para = []; } };
+  const flushList = () => { if (list) { nodes.push(list); list = null; } };
+  let secN = 0;
+  for (const raw of lines) {
+    const line = raw.trimEnd();
+    let m;
+    if ((m = line.match(/^(#{1,4})\s+(.*)$/))) {
+      flushPara(); flushList();
+      const level = m[1].length, text = m[2];
+      const h = el("h" + Math.min(level + 1, 5), null, text);
+      if (level <= 2) { const id = "sec-" + (secN++); h.id = id; sections.push({ id, text }); }
+      nodes.push(h);
+    } else if ((m = line.match(/^\s*[-*]\s+(.*)$/))) {
+      flushPara();
+      if (!list || list.tagName !== "UL") { flushList(); list = el("ul"); }
+      list.append(inline(el("li"), m[1]));
+    } else if ((m = line.match(/^\s*\d+\.\s+(.*)$/))) {
+      flushPara();
+      if (!list || list.tagName !== "OL") { flushList(); list = el("ol"); }
+      list.append(inline(el("li"), m[1]));
+    } else if (!line.trim()) {
+      flushPara(); flushList();
+    } else {
+      flushList(); para.push(line.trim());
+    }
+  }
+  flushPara(); flushList();
+  return { nodes, sections };
+}
+
+// Render inline **bold** and `code` into a node without ever using innerHTML.
+function inline(node, text) {
+  const re = /(\*\*[^*]+\*\*|`[^`]+`)/g;
+  let last = 0, m;
+  while ((m = re.exec(text))) {
+    if (m.index > last) node.append(document.createTextNode(text.slice(last, m.index)));
+    const tok = m[0];
+    if (tok.startsWith("**")) node.append(el("strong", null, tok.slice(2, -2)));
+    else node.append(el("code", null, tok.slice(1, -1)));
+    last = m.index + tok.length;
+  }
+  if (last < text.length) node.append(document.createTextNode(text.slice(last)));
+  return node;
+}
+
+function switchTab(name) {
+  document.querySelectorAll(".tab").forEach((b) => b.classList.toggle("active", b.dataset.tab === name));
+  $("#tab-debate").hidden = name !== "debate";
+  $("#tab-document").hidden = name !== "document";
+}
+document.querySelectorAll(".tab").forEach((b) => (b.onclick = () => switchTab(b.dataset.tab)));
 
 function renderHead(snap) {
   const head = $("#session-head");
@@ -84,6 +162,28 @@ function renderSummary(snap) {
 function renderGate(snap) {
   const wrap = $("#gate");
   wrap.replaceChildren();
+
+  if (snap.state === "BUDGET_STOP") {
+    const box = el("div", "gate-box");
+    box.append(el("h3", null, "Budget reached"));
+    box.append(el("div", "facts",
+      `Spent $${snap.cost_usd.toFixed(4)} of the $${snap.budget_usd.toFixed(2)} cap. ` +
+      "Raise it to continue from where it stopped."));
+    const row = el("div", "row");
+    const input = el("input"); input.type = "number"; input.step = "1";
+    input.value = Math.ceil(snap.budget_usd * 2); input.style.maxWidth = "8rem";
+    const b = el("button", "primary", "Raise & resume");
+    b.onclick = async () => {
+      await api(`/api/sessions/${active}/budget`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ budget: parseFloat(input.value) }),
+      });
+      await refresh(); loadSessions();
+    };
+    row.append(input, b); box.append(row); wrap.append(box);
+    return;
+  }
+
   const gate = snap.gate;
   if (!gate) return;
 
@@ -209,6 +309,12 @@ async function showNewForm() {
     opt.value = t.name;
     sel.append(opt);
   }
+  const psel = $("#profile");
+  psel.replaceChildren();
+  const { profiles, default_budget } = await api("/api/profiles");
+  const def = el("option", null, "default"); def.value = ""; psel.append(def);
+  for (const name of profiles) { const o = el("option", null, name); o.value = name; psel.append(o); }
+  $("#budget").placeholder = `default $${default_budget}`;
   $("#new-form").hidden = false;
   loadSessions();
 }
@@ -219,12 +325,16 @@ $("#new-form").onsubmit = async (e) => {
   e.preventDefault();
   const idea = $("#idea").value.trim();
   if (!idea) return;
+  const budgetVal = $("#budget").value.trim();
   const { id } = await api("/api/sessions", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ idea, template: $("#template").value, context: $("#context").value }),
+    body: JSON.stringify({
+      idea, template: $("#template").value, context: $("#context").value,
+      profile: $("#profile").value, budget: budgetVal ? parseFloat(budgetVal) : null,
+    }),
   });
-  $("#idea").value = ""; $("#context").value = "";
+  $("#idea").value = ""; $("#context").value = ""; $("#budget").value = "";
   openSession(id);
 };
 

@@ -26,7 +26,7 @@ from duet.schemas.events import Event
 from duet.schemas.model_io import ModelRequest, Turn
 from duet.store.session import SessionStore
 
-app = typer.Typer(help=f"Duet v{__version__} — cross-model agent loop")
+app = typer.Typer(help=f"Duet v{__version__} — cross-model debate: an idea, argued to an agreed document by models from different labs.")
 console = Console()
 
 
@@ -424,12 +424,16 @@ def new(
     context_paths: list[Path] = typer.Option(
         [], "--context", help="Reference material; repeatable. Defaults to ./CONTEXT.md"
     ),
-    profile: Optional[str] = typer.Option(None),
-    config_path: Optional[Path] = typer.Option(None, "--config"),
+    profile: Optional[str] = typer.Option(None, help="Config profile from ~/.duet/profiles (e.g. cheap, flagship)"),
+    config_path: Optional[Path] = typer.Option(None, "--config", help="Path to a duet.toml"),
     actor: str = typer.Option(getpass.getuser(), help="Who is answering the gates"),
     budget: Optional[float] = typer.Option(None, "--budget", help="Override budget.max_usd"),
 ):
-    """Start a session: debate an idea into an approved spec (Phase A)."""
+    """Start a session: debate an idea into an agreed document (Phase A).
+
+    The document's shape follows --template: an implementation spec, a decision
+    record, or a design brief. See `duet templates`.
+    """
     cfg = _budgeted(load_config(config_path, profile), budget)
     brief = _read_brief(idea)
     context = _load_context(context_paths)
@@ -454,8 +458,8 @@ def new(
 @app.command()
 def resume(
     session_id: str,
-    profile: Optional[str] = typer.Option(None),
-    config_path: Optional[Path] = typer.Option(None, "--config"),
+    profile: Optional[str] = typer.Option(None, help="Config profile from ~/.duet/profiles (e.g. cheap, flagship)"),
+    config_path: Optional[Path] = typer.Option(None, "--config", help="Path to a duet.toml"),
     actor: str = typer.Option(getpass.getuser(), help="Who is answering the gates"),
     budget: Optional[float] = typer.Option(
         None, "--budget", help="Override budget.max_usd — how you lift a budget stop"
@@ -486,8 +490,8 @@ def resume(
 def review(
     session_id: str = typer.Argument(..., help="Session id, or any unambiguous prefix"),
     file: Optional[Path] = typer.Option(None, "--file", help="Spec to review; default: edit the session's own"),
-    profile: Optional[str] = typer.Option(None),
-    config_path: Optional[Path] = typer.Option(None, "--config"),
+    profile: Optional[str] = typer.Option(None, help="Config profile from ~/.duet/profiles (e.g. cheap, flagship)"),
+    config_path: Optional[Path] = typer.Option(None, "--config", help="Path to a duet.toml"),
     actor: str = typer.Option(getpass.getuser(), help="Who is proposing the revision"),
     budget: Optional[float] = typer.Option(None, "--budget", help="Override budget.max_usd"),
 ):
@@ -531,8 +535,8 @@ def review(
 def web(
     host: str = typer.Option("127.0.0.1", help="Bind address; localhost by default"),
     port: int = typer.Option(8765),
-    profile: Optional[str] = typer.Option(None),
-    config_path: Optional[Path] = typer.Option(None, "--config"),
+    profile: Optional[str] = typer.Option(None, help="Config profile from ~/.duet/profiles (e.g. cheap, flagship)"),
+    config_path: Optional[Path] = typer.Option(None, "--config", help="Path to a duet.toml"),
 ):
     """Open the debate in a browser: watch a session and answer gates there.
 
@@ -546,9 +550,13 @@ def web(
         raise typer.Exit(code=1)
     from duet.web.app import create_app
 
-    cfg = load_config(config_path, profile)
-    console.print(f"duet web on [bold]http://{host}:{port}[/] · {len(cfg.participants)} participants")
-    uvicorn.run(create_app(cfg), host=host, port=port, log_level="warning")
+    # Pass the path + profile, not a fixed config, so the browser can pick a
+    # profile per debate; a bare `duet web` still resolves the default config.
+    console.print(f"duet web on [bold]http://{host}:{port}[/]")
+    uvicorn.run(
+        create_app(config_path=config_path, base_profile=profile),
+        host=host, port=port, log_level="warning",
+    )
 
 
 @app.command()
@@ -564,8 +572,8 @@ def templates():
 
 @app.command()
 def roster(
-    profile: Optional[str] = typer.Option(None),
-    config_path: Optional[Path] = typer.Option(None, "--config"),
+    profile: Optional[str] = typer.Option(None, help="Config profile from ~/.duet/profiles (e.g. cheap, flagship)"),
+    config_path: Optional[Path] = typer.Option(None, "--config", help="Path to a duet.toml"),
 ):
     """Show the configured participants and the roles they take on task 1."""
     cfg = load_config(config_path, profile)
@@ -586,8 +594,8 @@ def roster(
 
 @app.command("config")
 def show_config(
-    profile: Optional[str] = typer.Option(None),
-    config_path: Optional[Path] = typer.Option(None, "--config"),
+    profile: Optional[str] = typer.Option(None, help="Config profile from ~/.duet/profiles (e.g. cheap, flagship)"),
+    config_path: Optional[Path] = typer.Option(None, "--config", help="Path to a duet.toml"),
 ):
     """Print the resolved configuration."""
     cfg = load_config(config_path, profile)

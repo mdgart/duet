@@ -127,3 +127,35 @@ def test_missing_session_is_404(client):
 def test_the_index_page_serves(client):
     r = client.get("/")
     assert r.status_code == 200 and "duet" in r.text.lower()
+
+
+def test_profiles_endpoint_lists_profiles_and_a_default_budget(client, tmp_path):
+    (tmp_path / "profiles").mkdir()
+    (tmp_path / "profiles" / "cheap.toml").write_text("[budget]\nmax_usd = 2.0\n")
+    body = client.get("/api/profiles").json()
+    assert "cheap" in body["profiles"]
+    assert body["default_budget"] > 0
+
+
+def test_budget_and_profile_are_recorded_on_the_session(client):
+    sid = client.post("/api/sessions", json={"idea": "x", "budget": 3.5}).json()["id"]
+    wait_until(lambda: client.get(f"/api/sessions/{sid}").json()["gate"])
+    assert client.get(f"/api/sessions/{sid}").json()["budget_usd"] == 3.5
+
+
+def test_a_budget_stop_can_be_raised_from_the_browser(client):
+    # A cap of a fraction of a cent stops within the first couple of turns.
+    sid = client.post("/api/sessions", json={"idea": "x", "budget": 0.0025}).json()["id"]
+    snap = wait_until(lambda: (s := client.get(f"/api/sessions/{sid}").json())["state"] == "BUDGET_STOP" and s)
+    assert snap["budget_usd"] == 0.0025
+
+    # Raising the cap records it and lifts the stop — the session leaves
+    # BUDGET_STOP and the higher cap persists (readable on a later resume).
+    assert client.post(f"/api/sessions/{sid}/budget", json={"budget": 25.0}).json() == {"ok": True}
+    resumed = wait_until(lambda: (s := client.get(f"/api/sessions/{sid}").json())["state"] != "BUDGET_STOP" and s)
+    assert resumed["budget_usd"] == 25.0
+
+
+def test_unknown_profile_is_rejected(client, tmp_path):
+    r = client.post("/api/sessions", json={"idea": "x", "profile": "ghost"})
+    assert r.status_code == 400

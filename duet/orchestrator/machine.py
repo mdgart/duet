@@ -76,6 +76,27 @@ class Machine:
                 return event.payload["template"]
         return "software"
 
+    def session_profile(self) -> str:
+        for event in self.store.events():
+            if event.type == "state_change" and event.payload.get("profile"):
+                return event.payload["profile"]
+        return ""
+
+    def session_budget(self) -> "float | None":
+        """The session's cap: the latest raise if any, else what it started with.
+        Persisted so a budget stop can be lifted and stays lifted (§7.2)."""
+        budget = None
+        for event in self.store.events():
+            if event.type == "state_change" and "budget_usd" in event.payload:
+                budget = event.payload["budget_usd"]
+            elif event.type == "budget":
+                budget = event.payload["max_usd"]
+        return budget
+
+    def raise_budget(self, new_usd: float, actor: str = "web") -> None:
+        """Record a higher cap so a suspended budget stop can resume (§7.2)."""
+        self.store.append("budget", {"max_usd": new_usd, "actor": actor})
+
     def context(self) -> str:
         """Reference material for the session, fixed at creation.
 
@@ -120,7 +141,14 @@ class Machine:
 
     # -- driving -----------------------------------------------------------
 
-    def start(self, brief: str, context: str = "", template: str = "software") -> RunResult:
+    def start(
+        self,
+        brief: str,
+        context: str = "",
+        template: str = "software",
+        profile: str = "",
+        budget_usd: float | None = None,
+    ) -> RunResult:
         DebateEngine.check_context(self.config, context)
         # The roster is pinned to the session, not re-read from config on
         # resume. Only the participant who raised an objection may close it, so
@@ -131,6 +159,12 @@ class Machine:
             "template": template,
             "roster": [p.model_dump() for p in self.config.participants],
         }
+        # Recorded so a resume — in another process, or the web after a restart —
+        # rebuilds the same config without the original command line.
+        if profile:
+            payload["profile"] = profile
+        if budget_usd is not None:
+            payload["budget_usd"] = budget_usd
         if context.strip():
             # Stored inline for faithful replay and as a file for reading.
             payload["context"] = context

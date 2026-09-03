@@ -118,6 +118,11 @@ uv sync --extra web
 duet web            # http://127.0.0.1:8765
 ```
 
+Start a debate with a template, a roster profile and a budget cap; watch it
+stream; read the agreed document on its own rendered page with a section
+jump-list; and if a run hits its budget, raise the cap and resume — all in the
+browser.
+
 It binds to localhost and the browser never sees your provider keys; they stay
 in the `duet web` process, exactly as in the CLI. It is one service reading the
 same event log — see [PLAN §6](PLAN.md#6-v2--web-ui-ideation-mcp) for the hosted,

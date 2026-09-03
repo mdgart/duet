@@ -96,6 +96,25 @@ textarea, select, input {
 .turn li { color: var(--dim); }
 .state-line { color: var(--dim); font-size: .82rem; text-align: center; padding: .2rem; }
 
-pre#document { white-space: pre-wrap; word-break: break-word; font-size: .82rem; max-height: 60vh; overflow: auto; }
-details#doc-wrap { margin: .8rem 0; }
-details#doc-wrap summary { cursor: pointer; color: var(--dim); }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: .8rem; }
+
+#tabs { display: flex; gap: .3rem; border-bottom: 1px solid var(--line); margin-bottom: 1rem; }
+.tab { border: none; border-bottom: 2px solid transparent; border-radius: 0; background: none; color: var(--dim); padding: .5rem .7rem; }
+.tab:hover { color: var(--ink); }
+.tab.active { color: var(--ink); border-bottom-color: var(--accent); font-weight: 600; }
+
+#tab-document { display: grid; grid-template-columns: 180px 1fr; gap: 1.4rem; align-items: start; }
+@media (max-width: 720px) { #tab-document { grid-template-columns: 1fr; } }
+#doc-nav { position: sticky; top: 60px; display: flex; flex-direction: column; gap: .1rem; }
+#doc-nav:empty { display: none; }
+.doc-link { color: var(--dim); text-decoration: none; font-size: .85rem; padding: .2rem 0; border-left: 2px solid var(--line); padding-left: .6rem; }
+.doc-link:hover { color: var(--accent); border-left-color: var(--accent); }
+#doc { max-width: 46rem; min-width: 0; }
+#doc h2 { font-size: 1.05rem; margin: 1.6rem 0 .4rem; padding-bottom: .2rem; border-bottom: 1px solid var(--line); }
+#doc h3 { font-size: .95rem; margin: 1.1rem 0 .3rem; }
+#doc h4 { font-size: .88rem; margin: .9rem 0 .2rem; color: var(--dim); }
+#doc p { margin: .5rem 0; }
+#doc ul, #doc ol { margin: .5rem 0; padding-left: 1.3rem; }
+#doc li { margin: .2rem 0; }
+#doc code { background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 0 .3em; font-size: .88em; }
+#doc h1 { font-size: 1.3rem; }

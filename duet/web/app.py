@@ -26,6 +26,8 @@ class NewSession(BaseModel):
     idea: str
     template: str = "software"
     context: str = ""
+    profile: str = ""
+    budget: float | None = None
 
 
 class GateDecision(BaseModel):
@@ -33,6 +35,21 @@ class GateDecision(BaseModel):
     actor: str = "web"
     feedback: str = ""
     edited_markdown: str = ""
+
+
+class RaiseBudget(BaseModel):
+    budget: float
+    actor: str = "web"
+
+
+def available_profiles(root: Path | None) -> list[str]:
+    """Profile names under ~/.duet/profiles (or DUET_HOME)."""
+    from duet.schemas.config import duet_home
+
+    base = (root / "profiles") if root else duet_home() / "profiles"
+    if not base.is_dir():
+        return []
+    return sorted(p.stem for p in base.glob("*.toml"))
 
 
 def session_snapshot(runner: Runner, session_id: str) -> dict[str, Any]:
@@ -62,6 +79,7 @@ def session_snapshot(runner: Runner, session_id: str) -> dict[str, Any]:
         "template": machine.template(),
         "brief": machine.brief(),
         "cost_usd": round(store.cost_usd, 4),
+        "budget_usd": machine.session_budget() or runner.config_for(store).budget.max_usd,
         "running": runner.is_running(session_id),
         "gate": gate,
         "summary": summary,
@@ -69,14 +87,32 @@ def session_snapshot(runner: Runner, session_id: str) -> dict[str, Any]:
     }
 
 
-def create_app(config: DuetConfig | None = None, root: Path | None = None) -> FastAPI:
-    runner = Runner(config=config or load_config(), root=root)
+def create_app(
+    config: DuetConfig | None = None,
+    root: Path | None = None,
+    config_path: Path | None = None,
+    base_profile: str | None = None,
+) -> FastAPI:
+    # A fixed config (tests) or per-session profile loading (the real server).
+    runner = Runner(
+        config=config if config is not None else (None if (config_path or base_profile) else load_config()),
+        config_path=config_path,
+        base_profile=base_profile,
+        root=root,
+    )
     app = FastAPI(title="duet")
     app.state.runner = runner
 
     @app.get("/api/templates")
     def templates() -> list[dict]:
         return [{"name": t.name, "label": t.label, "when": t.when} for t in TEMPLATES.values()]
+
+    @app.get("/api/profiles")
+    def profiles() -> dict:
+        return {
+            "profiles": available_profiles(root),
+            "default_budget": runner._load(None, None).budget.max_usd,
+        }
 
     @app.get("/api/sessions")
     def sessions() -> list[dict]:
@@ -103,7 +139,12 @@ def create_app(config: DuetConfig | None = None, root: Path | None = None) -> Fa
             raise HTTPException(400, f"unknown template {body.template!r}")
         if not body.idea.strip():
             raise HTTPException(400, "idea is empty")
-        sid = runner.start(body.idea, body.template, context=body.context)
+        if body.profile and body.profile not in available_profiles(root):
+            raise HTTPException(400, f"unknown profile {body.profile!r}")
+        sid = runner.start(
+            body.idea, body.template, context=body.context,
+            profile=body.profile, budget=body.budget,
+        )
         return {"id": sid}
 
     @app.get("/api/sessions/{session_id}")
@@ -132,6 +173,11 @@ def create_app(config: DuetConfig | None = None, root: Path | None = None) -> Fa
             )
         except ValueError as e:
             raise HTTPException(400, str(e))
+        return {"ok": True}
+
+    @app.post("/api/sessions/{session_id}/budget")
+    def raise_budget(session_id: str, body: RaiseBudget) -> dict:
+        runner.raise_budget(session_id, body.budget, body.actor)
         return {"ok": True}
 
     @app.get("/")

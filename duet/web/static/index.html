@@ -29,6 +29,14 @@
         <label>Document shape
           <select id="template"></select>
         </label>
+        <div class="grid2">
+          <label>Roster
+            <select id="profile"></select>
+          </label>
+          <label>Budget cap (USD)
+            <input id="budget" type="number" step="0.5" min="0" placeholder="default">
+          </label>
+        </div>
         <label>Context <span class="hint">(optional — facts the models must treat as settled)</span>
           <textarea id="context" rows="3" placeholder="e.g. We already run Postgres 16."></textarea>
         </label>
@@ -39,12 +47,23 @@
       </form>
 
       <div id="session" hidden>
-        <div id="session-head"></div>
-        <div id="summary"></div>
-        <div id="gate"></div>
-        <details id="doc-wrap"><summary>Full document</summary><pre id="document"></pre></details>
-        <h3>Debate</h3>
-        <div id="timeline"></div>
+        <nav id="tabs">
+          <button data-tab="debate" class="tab active">Debate</button>
+          <button data-tab="document" class="tab">Document</button>
+        </nav>
+
+        <div id="tab-debate">
+          <div id="session-head"></div>
+          <div id="summary"></div>
+          <div id="gate"></div>
+          <h3>Debate</h3>
+          <div id="timeline"></div>
+        </div>
+
+        <div id="tab-document" hidden>
+          <div id="doc-nav"></div>
+          <article id="doc"></article>
+        </div>
       </div>
     </section>
   </main>
