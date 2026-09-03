@@ -34,7 +34,7 @@ attention.
 | Document shapes: implementation spec, decision record, design brief | ✅ |
 | OpenAI + Anthropic adapters, any number of participants | ✅ |
 | Resumable sessions, cost tracking, budget caps that suspend not end | ✅ |
-| Web UI to read and approve debates in a browser | ⬜ next ([plan](PLAN.md#6-v2--web-ui-ideation-mcp)) |
+| Web UI to read and approve debates in a browser (`duet web`) | ✅ local |
 | Spec → working code in a sandbox (Phase B) | ⬜ after the UI |
 | MCP server, ideation phase | ⬜ [planned](PLAN.md#6-v2--web-ui-ideation-mcp) |
 
@@ -106,6 +106,22 @@ action (approve/edit/revise/reject/view):
 
 `view` pages the full spec — which is written for whoever builds it and runs to
 tens of thousands of characters, so it is not what you read to decide.
+
+## In a browser
+
+The terminal is cramped for reading a ten-objection debate. `duet web` opens the
+same session in a browser — watch it stream live, read the summary and objection
+headlines, and approve, revise or reject at the gate:
+
+```bash
+uv sync --extra web
+duet web            # http://127.0.0.1:8765
+```
+
+It binds to localhost and the browser never sees your provider keys; they stay
+in the `duet web` process, exactly as in the CLI. It is one service reading the
+same event log — see [PLAN §6](PLAN.md#6-v2--web-ui-ideation-mcp) for the hosted,
+multi-user path.
 **approve** accepts it, **edit** opens `$EDITOR`, **revise** sends it back with
 feedback, **reject** ends the session.
 
@@ -152,6 +168,7 @@ text; no URL in it is ever fetched.
 | `duet review <id>` | Put an edited spec back to the models for one critique round. |
 | `duet sessions` | List sessions — what each was about, owner, state and cost, newest first. |
 | `duet templates` | List the document shapes (software, decision, design). |
+| `duet web` | Open the debate in a browser: watch and approve there. |
 | `duet roster` | Show participants, their roles, and what they cost. |
 | `duet ping` | Check every participant's credentials and adapter. |
 | `duet config` | Print the resolved configuration. |

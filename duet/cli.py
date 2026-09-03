@@ -528,6 +528,30 @@ def review(
 
 
 @app.command()
+def web(
+    host: str = typer.Option("127.0.0.1", help="Bind address; localhost by default"),
+    port: int = typer.Option(8765),
+    profile: Optional[str] = typer.Option(None),
+    config_path: Optional[Path] = typer.Option(None, "--config"),
+):
+    """Open the debate in a browser: watch a session and answer gates there.
+
+    Binds to localhost by default. The browser never sees provider keys — they
+    stay in this process's environment, exactly as in the CLI.
+    """
+    try:
+        import uvicorn
+    except ModuleNotFoundError:
+        console.print("[red]the web UI needs extra dependencies[/]: uv sync --extra web")
+        raise typer.Exit(code=1)
+    from duet.web.app import create_app
+
+    cfg = load_config(config_path, profile)
+    console.print(f"duet web on [bold]http://{host}:{port}[/] · {len(cfg.participants)} participants")
+    uvicorn.run(create_app(cfg), host=host, port=port, log_level="warning")
+
+
+@app.command()
 def templates():
     """List the document shapes a debate can produce."""
     table = Table("template", "produces", "when to use")

@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>duet</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header>
+    <h1>duet</h1>
+    <span class="tag">cross-model debate</span>
+  </header>
+
+  <main>
+    <aside id="sidebar">
+      <button id="new-btn" class="primary">＋ New debate</button>
+      <div id="session-list"></div>
+    </aside>
+
+    <section id="detail">
+      <div id="empty" class="empty">Pick a session, or start a new debate.</div>
+
+      <form id="new-form" hidden>
+        <h2>New debate</h2>
+        <label>Idea or brief
+          <textarea id="idea" rows="4" placeholder="e.g. should we adopt trunk-based development?"></textarea>
+        </label>
+        <label>Document shape
+          <select id="template"></select>
+        </label>
+        <label>Context <span class="hint">(optional — facts the models must treat as settled)</span>
+          <textarea id="context" rows="3" placeholder="e.g. We already run Postgres 16."></textarea>
+        </label>
+        <div class="row">
+          <button type="submit" class="primary">Start debate</button>
+          <button type="button" id="cancel-new">Cancel</button>
+        </div>
+      </form>
+
+      <div id="session" hidden>
+        <div id="session-head"></div>
+        <div id="summary"></div>
+        <div id="gate"></div>
+        <details id="doc-wrap"><summary>Full document</summary><pre id="document"></pre></details>
+        <h3>Debate</h3>
+        <div id="timeline"></div>
+      </div>
+    </section>
+  </main>
+
+  <script src="/app.js"></script>
+</body>
+</html>
