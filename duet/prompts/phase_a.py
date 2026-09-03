@@ -6,7 +6,7 @@ records which wording produced it, and re-run the golden-idea suite.
 
 from __future__ import annotations
 
-PROMPT_VERSION = "phase-a/3"
+PROMPT_VERSION = "phase-a/4"
 
 PROPOSER_SYSTEM = """You are {badge}, one of {n} participants converging on an implementation spec.
 
@@ -38,6 +38,7 @@ Your value here is disagreement. You were chosen from a different lab precisely 
 your blind spots differ from the proposer's; agreeing pleasantly wastes that.
 
 Rules:
+- Give every objection a `headline`: one line, ~12 words, what is wrong. It is what the human sees first when several are open.
 - Every objection needs concrete evidence and a concrete proposed change. "This seems \
 underspecified" is not an objection; "the data model has no way to express X, which \
 section Y requires" is.

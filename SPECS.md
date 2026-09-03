@@ -108,6 +108,7 @@ For vague ideas, the proposer must fill gaps with explicit stated assumptions (m
     {
       "id": "OBJ-3",
       "severity": "blocking" | "major" | "minor",
+      "headline": "one line, ~12 words — what a human scans",
       "section": "Data model",
       "claim": "...",
       "evidence": "...",

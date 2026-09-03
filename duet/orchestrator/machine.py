@@ -234,6 +234,7 @@ class Machine:
                 {
                     "id": e.id,
                     "severity": e.severity,
+                    "headline": e.one_line,
                     "section": e.section,
                     "claim": e.claim,
                     "held_by": sorted(set(e.raised_by) - set(e.closed_by)),

@@ -183,3 +183,22 @@ def test_no_such_section_before_anyone_has_objected(tmp_path: Path):
     cfg.debate.max_rounds = 1
     engine.run("an app")
     assert "# Your open objections" not in engine.providers["sol"].requests[0].messages[0].content
+
+
+def test_objection_headline_flows_into_the_ledger_and_falls_back(tmp_path: Path):
+    """Ten objections at a paragraph each is unreadable; the critic writes a
+    one-liner. Entries logged before headlines existed trim the claim instead."""
+    from duet.orchestrator.ledger import ObjectionLedger
+    from duet.schemas.debate import Objection, Verdict
+
+    ledger = ObjectionLedger()
+    ledger.merge_round(1, {"a": Verdict(verdict="OBJECT", objections=[
+        Objection(severity="blocking", headline="clock source is unspecified",
+                  section="Architecture", claim="a" * 300, evidence="e", proposed_change="p")])})
+    entry = ledger.entries[0]
+    assert entry.one_line == "clock source is unspecified"
+    assert entry.one_line in ledger.summary_lines()[0]
+    assert "a" * 300 not in ledger.summary_lines()[0]  # the wall of text stays out of prompts
+
+    entry.headline = ""  # a pre-headline log
+    assert entry.one_line.endswith("…") and len(entry.one_line) < 90

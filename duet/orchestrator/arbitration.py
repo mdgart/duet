@@ -106,6 +106,7 @@ def disagreement_report(
         lines += [
             f"## {entry.id} — {entry.severity}{raisers}",
             "",
+            f"*{entry.one_line}*" if entry.headline else "",
             f"**Section:** {entry.section}",
             f"**Claim:** {entry.claim}",
             f"**Evidence:** {entry.evidence}",

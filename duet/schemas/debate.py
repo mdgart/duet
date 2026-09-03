@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import re
+import textwrap
 from typing import Literal
 
 from pydantic import BaseModel, Field
@@ -93,6 +94,14 @@ class Objection(BaseModel):
     # No id field: canonical OBJ-n ids are assigned by the ledger, so asking a
     # model to invent one only produces numbers the orchestrator discards.
     severity: Severity
+    headline: str = Field(
+        default="",
+        description=(
+            "The objection in one line, at most about twelve words — what is wrong, "
+            "not the full argument. This is what a human scans when ten are open; the "
+            "claim below is the detail they read when one matters."
+        ),
+    )
     section: str
     claim: str
     evidence: str
@@ -166,6 +175,7 @@ class LedgerEntry(BaseModel):
 
     id: str
     severity: Severity
+    headline: str = ""
     section: str
     claim: str
     evidence: str
@@ -184,6 +194,14 @@ class LedgerEntry(BaseModel):
         if not self.raised_by or any(p not in self.closed_by for p in self.raised_by):
             return "open"
         return "waived" if "waived" in self.closed_by.values() else "resolved"
+
+    @property
+    def one_line(self) -> str:
+        """A scannable summary: the critic's headline, or a trimmed claim for
+        entries logged before headlines existed."""
+        if self.headline.strip():
+            return self.headline.strip()
+        return textwrap.shorten(self.claim, 76, placeholder="…")
 
     @property
     def key(self) -> str:

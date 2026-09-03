@@ -223,7 +223,8 @@ def _live_view(cfg: DuetConfig, store: SessionStore) -> None:
             note = f" [dim](coerced: {p['coerced']})[/]" if p.get("coerced") else ""
             console.print(f"{who} [bold {colour}]{v['verdict']}[/]{note}  {took()}")
             for o in v["objections"]:
-                console.print(f"    [dim]{o['severity']}[/] {o['section']}: {o['claim']}")
+                line = o.get("headline") or o["claim"][:76]
+                console.print(f"    [dim]{o['severity']}[/] {o['section'].split(' / ')[0]}: {line}")
             if v.get("resolved_objections"):
                 console.print(f"    [dim green]resolved {', '.join(v['resolved_objections'])}[/]")
         elif event.type == "state_change":
@@ -295,6 +296,7 @@ def _collect_rulings(gate) -> str:
         claim = "\n".join(f"#   {line}" for line in _wrap(o["claim"], 88))
         blocks.append(
             f"## {o['id']} — {o['severity']} (held by {held})\n"
+            f"# {o.get('headline') or ''}\n"
             f"# section: {o['section']}\n{claim}\n\n"
         )
     edited = _edit_text("\n".join(blocks))
@@ -359,10 +361,13 @@ def _show_gate(store: SessionStore, gate, detail: str) -> None:
             + "[/]"
         )
     if gate.objections:
-        console.print(f"[dim]unresolved:[/] " + ", ".join(
-            f"{o['id']} ({o['severity']}, held by {', '.join(o.get('held_by') or []) or '?'})"
-            for o in gate.objections
-        ))
+        console.print("[dim]unresolved:[/]")
+        for o in gate.objections:
+            held = ", ".join(o.get("held_by") or []) or "?"
+            console.print(
+                f"  [dim]{o['id']} ({o['severity']}, held by {held}):[/] "
+                + (o.get("headline") or o["claim"][:76])
+            )
     if path:
         console.print(f"[dim]full document: {path} ({len(markdown):,} chars)[/]")
 

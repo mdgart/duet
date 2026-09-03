@@ -72,7 +72,7 @@ class ObjectionLedger:
             who = "+".join(e.raised_by)
             tail = f" — {e.resolution}" if e.resolution else ""
             lines.append(
-                f"{e.id} [{e.severity}/{e.status}] (raised by {who}) {e.section}: {e.claim}{tail}"
+                f"{e.id} [{e.severity}/{e.status}] (raised by {who}) {e.section}: {e.one_line}{tail}"
             )
         return lines
 
@@ -128,6 +128,7 @@ class ObjectionLedger:
                 entry = LedgerEntry(
                     id=f"OBJ-{len(self.entries) + 1}",
                     severity=objection.severity,
+                    headline=objection.headline,
                     section=objection.section,
                     claim=objection.claim,
                     evidence=objection.evidence,
