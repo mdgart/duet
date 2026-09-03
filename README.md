@@ -123,6 +123,10 @@ stream; read the agreed document on its own rendered page with a section
 jump-list; and if a run hits its budget, raise the cap and resume — all in the
 browser.
 
+These design docs are readable in there too, under **Documentation** in the
+sidebar, so you can check how a gate or a template works without leaving the
+page you are deciding on.
+
 It binds to localhost and the browser never sees your provider keys; they stay
 in the `duet web` process, exactly as in the CLI. It is one service reading the
 same event log — see [PLAN §6](PLAN.md#6-v2--web-ui-ideation-mcp) for the hosted,
@@ -256,6 +260,9 @@ than by argument.
 
 - [PLAN.md](PLAN.md) — vision, milestones, and the V2 architecture
 - [SPECS.md](SPECS.md) — protocol, schemas, and the reasoning behind them
+
+All three are also served inside `duet web`, rendered with a section
+jump-list.
 
 ## Licence
 

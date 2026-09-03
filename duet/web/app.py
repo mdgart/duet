@@ -42,6 +42,24 @@ class RaiseBudget(BaseModel):
     actor: str = "web"
 
 
+# The project's own docs, readable in the UI. A fixed registry rather than a
+# path parameter: the id maps to a known filename, so no request can traverse
+# out of the docs directory.
+DOC_FILES: dict[str, tuple[str, str]] = {
+    "readme": ("Getting started", "README.md"),
+    "plan": ("Project plan", "PLAN.md"),
+    "specs": ("Technical spec", "SPECS.md"),
+}
+
+
+def docs_root() -> Path | None:
+    """Where the markdown docs live: shipped beside the package, else the checkout."""
+    for candidate in (Path(__file__).parent / "_docs", Path(__file__).resolve().parents[2]):
+        if (candidate / "README.md").is_file():
+            return candidate
+    return None
+
+
 def available_profiles(root: Path | None) -> list[str]:
     """Profile names under ~/.duet/profiles (or DUET_HOME)."""
     from duet.schemas.config import duet_home
@@ -106,6 +124,28 @@ def create_app(
     @app.get("/api/templates")
     def templates() -> list[dict]:
         return [{"name": t.name, "label": t.label, "when": t.when} for t in TEMPLATES.values()]
+
+    @app.get("/api/docs")
+    def docs() -> list[dict]:
+        base = docs_root()
+        if base is None:
+            return []
+        return [
+            {"id": doc_id, "title": title}
+            for doc_id, (title, filename) in DOC_FILES.items()
+            if (base / filename).is_file()
+        ]
+
+    @app.get("/api/docs/{doc_id}")
+    def doc(doc_id: str) -> dict:
+        base = docs_root()
+        if base is None or doc_id not in DOC_FILES:
+            raise HTTPException(404, "no such document")
+        title, filename = DOC_FILES[doc_id]
+        path = base / filename
+        if not path.is_file():
+            raise HTTPException(404, "no such document")
+        return {"id": doc_id, "title": title, "markdown": path.read_text()}
 
     @app.get("/api/profiles")
     def profiles() -> dict:

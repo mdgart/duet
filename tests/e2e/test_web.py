@@ -159,3 +159,23 @@ def test_a_budget_stop_can_be_raised_from_the_browser(client):
 def test_unknown_profile_is_rejected(client, tmp_path):
     r = client.post("/api/sessions", json={"idea": "x", "profile": "ghost"})
     assert r.status_code == 400
+
+
+# --- project documentation in the UI ----------------------------------------
+
+
+def test_docs_are_listed_and_readable(client):
+    docs = client.get("/api/docs").json()
+    ids = {d["id"] for d in docs}
+    assert {"readme", "plan", "specs"} <= ids
+
+    body = client.get("/api/docs/plan").json()
+    assert body["title"] == "Project plan"
+    assert body["markdown"].startswith("# Duet")
+    assert "|" in body["markdown"]  # tables, which the renderer must handle
+
+
+def test_an_unknown_doc_is_404_and_paths_cannot_traverse(client):
+    assert client.get("/api/docs/nope").status_code == 404
+    # The id maps to a fixed filename, so traversal has nothing to grab.
+    assert client.get("/api/docs/..%2F..%2Fetc%2Fpasswd").status_code == 404

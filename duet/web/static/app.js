@@ -42,6 +42,7 @@ async function openSession(id) {
   active = id;
   $("#new-form").hidden = true;
   $("#empty").hidden = true;
+  $("#docview").hidden = true;
   $("#session").hidden = false;
   $("#timeline").replaceChildren();
   $("#summary").replaceChildren();
@@ -64,20 +65,56 @@ async function refresh() {
 
 // -- document page: render the agreed document, with a section jump-list ----
 
-function renderDocument(md) {
-  const doc = $("#doc"), nav = $("#doc-nav");
-  doc.replaceChildren(); nav.replaceChildren();
-  if (!md) { doc.append(el("p", "empty", "No document yet — it appears once the models draft one.")); return; }
+function renderMarkdownInto(docEl, navEl, md, emptyText) {
+  docEl.replaceChildren(); navEl.replaceChildren();
+  if (!md) { docEl.append(el("p", "empty", emptyText)); return; }
   const { nodes, sections } = markdownToNodes(md);
-  nodes.forEach((n) => doc.append(n));
+  nodes.forEach((n) => docEl.append(n));
   if (sections.length > 2) {
     for (const sec of sections) {
       const a = el("a", "doc-link", sec.text);
       a.href = "#" + sec.id;
       a.onclick = (e) => { e.preventDefault(); document.getElementById(sec.id).scrollIntoView({ behavior: "smooth" }); };
-      nav.append(a);
+      navEl.append(a);
     }
   }
+}
+
+function renderDocument(md) {
+  renderMarkdownInto($("#doc"), $("#doc-nav"), md,
+    "No document yet — it appears once the models draft one.");
+}
+
+// -- project documentation -------------------------------------------------
+
+async function loadDocsList() {
+  const list = $("#docs-list");
+  list.replaceChildren();
+  let docs = [];
+  try { docs = await api("/api/docs"); } catch { /* docs not shipped */ }
+  if (!docs.length) { $("#docs-section").hidden = true; return; }
+  $("#docs-section").hidden = false;
+  for (const d of docs) {
+    const item = el("div", "session-item doc-item");
+    item.append(el("span", "lbl", d.title));
+    item.onclick = () => openDoc(d.id);
+    list.append(item);
+  }
+}
+
+async function openDoc(id) {
+  active = null;
+  if (stream) stream.close();
+  $("#session").hidden = true;
+  $("#new-form").hidden = true;
+  $("#empty").hidden = true;
+  $("#docview").hidden = false;
+  const d = await api(`/api/docs/${id}`);
+  $("#docview-title").textContent = d.title;
+  renderMarkdownInto($("#docview-body"), $("#docview-nav"), d.markdown, "");
+  document.querySelectorAll("#docs-list .doc-item").forEach((n, i) => n.classList.toggle("active", false));
+  loadSessions();
+  window.scrollTo({ top: 0 });
 }
 
 // A small, safe markdown renderer — enough for these documents (headings,
@@ -86,13 +123,49 @@ function renderDocument(md) {
 function markdownToNodes(md) {
   const nodes = [], sections = [];
   const lines = md.replace(/\r/g, "").split("\n");
-  let list = null, para = [];
+  let list = null, para = [], fence = null, table = null;
   const flushPara = () => { if (para.length) { nodes.push(inline(el("p"), para.join(" "))); para = []; } };
   const flushList = () => { if (list) { nodes.push(list); list = null; } };
+  const flushTable = () => { if (table) { nodes.push(table); table = null; } };
+  const flushAll = () => { flushPara(); flushList(); flushTable(); };
   let secN = 0;
   for (const raw of lines) {
     const line = raw.trimEnd();
     let m;
+
+    // Fenced code: everything inside is literal, including markdown syntax.
+    if (line.startsWith("```")) {
+      if (fence) { nodes.push(fence); fence = null; }
+      else { flushAll(); fence = el("pre"); }
+      continue;
+    }
+    if (fence) {
+      fence.append(document.createTextNode(raw + "\n"));
+      continue;
+    }
+
+    // Tables: | a | b | with a |---|---| separator row.
+    if (line.startsWith("|") && line.endsWith("|")) {
+      const cells = line.slice(1, -1).split("|").map((c) => c.trim());
+      if (cells.every((c) => /^:?-{2,}:?$/.test(c))) continue;  // separator row
+      flushPara(); flushList();
+      if (!table) { table = el("table"); table.dataset.head = "1"; }
+      const tr = el("tr");
+      const tag = table.dataset.head === "1" ? "th" : "td";
+      for (const c of cells) tr.append(inline(el(tag), c));
+      table.dataset.head = "0";
+      table.append(tr);
+      continue;
+    }
+    flushTable();
+
+    if (line === "---" || line === "***") { flushAll(); nodes.push(el("hr")); continue; }
+    if ((m = line.match(/^>\s?(.*)$/))) {
+      flushAll();
+      nodes.push(inline(el("blockquote"), m[1]));
+      continue;
+    }
+
     if ((m = line.match(/^(#{1,4})\s+(.*)$/))) {
       flushPara(); flushList();
       const level = m[1].length, text = m[2];
@@ -113,18 +186,21 @@ function markdownToNodes(md) {
       flushList(); para.push(line.trim());
     }
   }
-  flushPara(); flushList();
+  flushPara(); flushList(); flushTable();
+  if (fence) nodes.push(fence);
   return { nodes, sections };
 }
 
-// Render inline **bold** and `code` into a node without ever using innerHTML.
+// Render inline **bold**, *italic* and `code` into a node without ever using
+// innerHTML. Bold is listed before italic so ** is never eaten by the * rule.
 function inline(node, text) {
-  const re = /(\*\*[^*]+\*\*|`[^`]+`)/g;
+  const re = /(\*\*[^*]+\*\*|\*[^*\n]+\*|`[^`]+`)/g;
   let last = 0, m;
   while ((m = re.exec(text))) {
     if (m.index > last) node.append(document.createTextNode(text.slice(last, m.index)));
     const tok = m[0];
     if (tok.startsWith("**")) node.append(el("strong", null, tok.slice(2, -2)));
+    else if (tok.startsWith("*")) node.append(el("em", null, tok.slice(1, -1)));
     else node.append(el("code", null, tok.slice(1, -1)));
     last = m.index + tok.length;
   }
@@ -302,6 +378,7 @@ async function showNewForm() {
   if (stream) stream.close();
   $("#session").hidden = true;
   $("#empty").hidden = true;
+  $("#docview").hidden = true;
   const sel = $("#template");
   sel.replaceChildren();
   for (const t of await api("/api/templates")) {
@@ -339,4 +416,5 @@ $("#new-form").onsubmit = async (e) => {
 };
 
 loadSessions();
+loadDocsList();
 setInterval(() => { if (!active || !document.hidden) loadSessions(); }, 5000);
