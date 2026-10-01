@@ -8,6 +8,7 @@ client, are all just things that append a `gate_decision` event.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+import hashlib
 from typing import Literal
 
 from duet.orchestrator.arbitration import disagreement_report
@@ -25,6 +26,10 @@ GATE_1_OPTIONS = ["approve", "edit", "revise", "reject"]
 ARBITRATION_OPTIONS = ["resolve", "abort"]
 
 
+class GateConflict(ValueError):
+    """The gate changed after a client read it, or was already answered."""
+
+
 @dataclass
 class GateRequest:
     gate: str
@@ -33,6 +38,7 @@ class GateRequest:
     draft_hash: str
     objections: list[dict] = field(default_factory=list)
     facts: dict = field(default_factory=dict)
+    gate_seq: int | None = None
 
 
 @dataclass
@@ -131,7 +137,7 @@ class Machine:
         pending = decision = None
         for event in self.store.events():
             if event.type == "gate_pending":
-                pending, decision = event.payload, None
+                pending, decision = {**event.payload, "gate_seq": event.seq}, None
             elif event.type == "gate_decision" and pending is not None:
                 decision = event.payload
         return pending, decision
@@ -319,9 +325,10 @@ class Machine:
             payload["objections"] = objections
         if facts:
             payload["facts"] = facts
-        self.store.append("gate_pending", payload)
+        event = self.store.append("gate_pending", payload)
         return RunResult(
-            self.current_state(), suspended=True, gate=GateRequest(**payload), detail=detail
+            self.current_state(), suspended=True,
+            gate=GateRequest(**payload, gate_seq=event.seq), detail=detail
         )
 
     def _handle_gate(self, state: State) -> RunResult | None:
@@ -333,10 +340,37 @@ class Machine:
             return RunResult(state, suspended=True, gate=GateRequest(**pending),
                              detail="awaiting a gate decision")
 
+        if decision.get("draft_hash") != pending["draft_hash"] or (
+            decision.get("gate_seq") is not None
+            and decision["gate_seq"] != pending["gate_seq"]
+        ):
+            raise GateConflict("the decision does not match the current gate; reload the session")
+
         action = decision["action"]
         if action in ("approve", "edit"):
-            if action == "edit" and decision.get("edited_markdown"):
-                self.store.save_artifact("IMPLEMENTATION.md", decision["edited_markdown"])
+            if action == "edit":
+                markdown = decision.get("edited_markdown", "")
+                if not markdown.strip():
+                    raise ValueError("an edited document cannot be empty")
+                # A document edit is not a new debate round. Preserve it as a
+                # canonical revision without inventing model votes or changing
+                # the replayed objection ledger. Resume can safely repeat the
+                # artifact write if a process stopped after recording the event.
+                recorded = any(
+                    event.type == "artifact_revision"
+                    and event.payload.get("gate_seq") == pending["gate_seq"]
+                    for event in self.store.events()
+                )
+                if not recorded:
+                    self.store.append("artifact_revision", {
+                        "artifact": "artifacts/IMPLEMENTATION.md",
+                        "markdown": markdown,
+                        "hash": hashlib.sha256(markdown.encode()).hexdigest()[:12],
+                        "previous_hash": pending["draft_hash"],
+                        "actor": decision["actor"],
+                        "gate_seq": pending["gate_seq"],
+                    })
+                self.store.save_artifact("IMPLEMENTATION.md", markdown)
             self._transition("DONE", approved_by=decision["actor"])
             return RunResult("DONE", detail=f"spec approved by {decision['actor']}")
         if action in ("reject", "abort"):
@@ -367,19 +401,28 @@ class Machine:
 
 
 def submit_gate_decision(
-    store: SessionStore, *, action: str, actor: str, feedback: str = "", edited_markdown: str = ""
+    store: SessionStore, *, action: str, actor: str, feedback: str = "", edited_markdown: str = "",
+    expected_draft_hash: str | None = None, expected_gate_seq: int | None = None,
 ) -> None:
     """Answer the open gate. Any client may call this — that is the point."""
     pending = None
     for event in store.events():
         if event.type == "gate_pending":
-            pending = event.payload
+            pending = {**event.payload, "gate_seq": event.seq}
         elif event.type == "gate_decision":
             pending = None
     if pending is None:
-        raise ValueError("no gate is currently open")
+        raise GateConflict("no gate is currently open; reload the session")
+    if (
+        expected_draft_hash is not None and expected_draft_hash != pending["draft_hash"]
+    ) or (
+        expected_gate_seq is not None and expected_gate_seq != pending["gate_seq"]
+    ):
+        raise GateConflict("the gate has changed; reload and review the current document")
     if action not in pending["options"]:
         raise ValueError(f"action {action!r} not offered; options are {pending['options']}")
+    if action == "edit" and not edited_markdown.strip():
+        raise ValueError("an edited document cannot be empty")
     store.append(
         "gate_decision",
         {
@@ -390,6 +433,7 @@ def submit_gate_decision(
             "edited_markdown": edited_markdown,
             # Pins the decision to the exact text it was made against (SPECS §6.0).
             "draft_hash": pending["draft_hash"],
+            "gate_seq": pending["gate_seq"],
         },
     )
 

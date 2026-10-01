@@ -403,7 +403,8 @@ def _drive(machine: Machine, store: SessionStore, cfg: DuetConfig, actor: str, r
         if action == "edit":
             edited = _edit_text((store.dir / gate.artifacts[0]).read_text())
         submit_gate_decision(
-            store, action=action, actor=actor, feedback=feedback, edited_markdown=edited
+            store, action=action, actor=actor, feedback=feedback, edited_markdown=edited,
+            expected_draft_hash=gate.draft_hash, expected_gate_seq=gate.gate_seq,
         )
         result = machine.advance()
 

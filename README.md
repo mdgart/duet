@@ -38,8 +38,8 @@ attention.
 | Spec → working code in a sandbox (Phase B) | ⬜ after the UI |
 | MCP server, ideation phase | ⬜ [planned](PLAN.md#6-v2--web-ui-ideation-mcp) |
 
-Three test suites: 129 unit/e2e tests, 16 contract tests against live provider
-APIs, and a golden suite that runs three real debates end to end.
+Three Python test suites: offline unit/e2e tests, contract tests against live
+provider APIs, and a golden suite that runs three real debates end to end.
 
 ## Install
 
@@ -118,12 +118,24 @@ uv sync --extra web
 duet web            # http://127.0.0.1:8765
 ```
 
-Start a debate with a template, a roster profile and a budget cap; watch it
-stream; read the agreed document on its own rendered page with a section
-jump-list; and if a run hits its budget, raise the cap and resume — all in the
-browser.
+Start with a blank brief or one of three examples, then choose a template,
+roster profile and budget cap. Search your debates in the sidebar, follow the
+conversation by round, and expand an objection to read its evidence. The review
+panel shows the next decision alongside participants, spending and objection
+counts.
 
-These design docs are readable in there too, under **Documentation** in the
+The Document tab provides a readable draft with section navigation and Markdown
+export. **Edit document** opens the current Markdown in a browser editor;
+**Save & approve** makes that edited version the approved document. Approval
+requests identify the exact review and draft, so an older browser tab cannot
+approve a newer revision by accident. If a run reaches its budget, raise the
+cap and resume from the same panel.
+
+The interface adapts to narrow screens, follows your system light/dark theme,
+and supports keyboard navigation and reduced motion. It uses local static
+assets with no frontend build step or external fonts.
+
+These design docs are readable in there too, under **Resources** in the
 sidebar, so you can check how a gate or a template works without leaving the
 page you are deciding on.
 
@@ -131,7 +143,7 @@ It binds to localhost and the browser never sees your provider keys; they stay
 in the `duet web` process, exactly as in the CLI. It is one service reading the
 same event log — see [PLAN §6](PLAN.md#6-v2--web-ui-ideation-mcp) for the hosted,
 multi-user path.
-**approve** accepts it, **edit** opens `$EDITOR`, **revise** sends it back with
+In the terminal, **approve** accepts it, **edit** opens `$EDITOR`, **revise** sends it back with
 feedback, **reject** ends the session.
 
 If the models cannot agree, you get a disagreement report instead: what each

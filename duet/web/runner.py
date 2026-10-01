@@ -14,7 +14,7 @@ import threading
 from dataclasses import dataclass, field
 from typing import Any, Iterator
 
-from duet.orchestrator.machine import Machine, RunResult, pin_roster, providers_for, submit_gate_decision
+from duet.orchestrator.machine import GateConflict, Machine, pin_roster, providers_for, submit_gate_decision
 from duet.schemas.config import DuetConfig, load_config, duet_home
 from duet.schemas.events import Event
 from duet.store.session import SessionStore
@@ -66,6 +66,7 @@ class Runner:
     broker: Broker = field(default_factory=Broker)
     _threads: dict[str, threading.Thread] = field(default_factory=dict)
     _lock: threading.Lock = field(default_factory=threading.Lock)
+    _session_locks: dict[str, Any] = field(default_factory=dict)
 
     # -- config resolution ------------------------------------------------
 
@@ -118,18 +119,36 @@ class Runner:
         return store.session_id
 
     def submit_gate(self, session_id: str, action: str, actor: str, **kw) -> None:
-        store = self.store(session_id)
-        submit_gate_decision(store, action=action, actor=actor, **kw)
-        # Resume the machine so the next state (another gate, or DONE) is reached.
-        self._run_in_background(store, self.config_for(store), lambda m: m.advance())
+        # Serialize the read/check/append/start exchange. Two browser tabs must
+        # not both answer one gate or start overlapping writers for the session.
+        with self._session_lock(session_id):
+            self._ensure_idle(session_id)
+            store = self.store(session_id)
+            submit_gate_decision(store, action=action, actor=actor, **kw)
+            self._run_in_background(store, self.config_for(store), lambda m: m.advance())
 
     def raise_budget(self, session_id: str, new_usd: float, actor: str = "web") -> None:
         """Lift a budget stop from the browser and resume (§7.2)."""
-        store = self.store(session_id)
-        Machine(self.config_for(store), store, {}).raise_budget(new_usd, actor)
-        self._run_in_background(store, self.config_for(store), lambda m: m.advance())
+        with self._session_lock(session_id):
+            self._ensure_idle(session_id)
+            store = self.store(session_id)
+            Machine(self.config_for(store), store, {}).raise_budget(new_usd, actor)
+            self._run_in_background(store, self.config_for(store), lambda m: m.advance())
+
+    def _session_lock(self, session_id: str):
+        with self._lock:
+            return self._session_locks.setdefault(session_id, threading.RLock())
+
+    def _ensure_idle(self, session_id: str) -> None:
+        if self.is_running(session_id):
+            raise GateConflict("the session is still running; wait for it to finish and reload")
 
     def _run_in_background(self, store: SessionStore, cfg: DuetConfig, drive) -> None:
+        with self._session_lock(store.session_id):
+            self._ensure_idle(store.session_id)
+            self._start_thread(store, cfg, drive)
+
+    def _start_thread(self, store: SessionStore, cfg: DuetConfig, drive) -> None:
         machine = Machine(cfg, store, providers_for(cfg))
         store.subscribe(lambda event: self.broker.publish(store.session_id, event))
 
