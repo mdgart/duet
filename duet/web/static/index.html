@@ -1,85 +1,373 @@
 <!doctype html>
 <html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>duet</title>
-  <link rel="stylesheet" href="/style.css">
-</head>
-<body>
-  <header>
-    <h1>duet</h1>
-    <span class="tag">cross-model debate</span>
-  </header>
-
-  <main>
-    <aside id="sidebar">
-      <button id="new-btn" class="primary">＋ New debate</button>
-      <div id="session-list"></div>
-      <div id="docs-section">
-        <h4 class="side-head">Documentation</h4>
-        <div id="docs-list"></div>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#24242b" />
+    <meta
+      name="description"
+      content="A thoughtful workspace for turning an idea into a well-examined plan."
+    />
+    <title>Duet — Think it through</title>
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <a href="#detail" class="skip-link">Skip to content</a>
+    <aside id="sidebar" class="sidebar" aria-label="Workspace navigation">
+      <button id="home-btn" class="brand" aria-label="Duet home">
+        <span class="brand-mark" aria-hidden="true"><i></i><i></i></span
+        ><span>duet<span class="brand-period">.</span></span>
+      </button>
+      <button id="new-btn" class="new-button">
+        <span aria-hidden="true">＋</span> New debate
+      </button>
+      <label class="session-search"
+        ><span class="sr-only">Search debates</span
+        ><svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.6"
+          aria-hidden="true"
+        >
+          <circle cx="10.7" cy="10.7" r="6.2" />
+          <path d="m15.5 15.5 4.1 4.1" /></svg
+        ><input
+          id="session-search"
+          type="search"
+          placeholder="Find a debate…"
+          autocomplete="off"
+      /></label>
+      <div class="sidebar-section-heading">
+        <span>Your debates</span><span id="session-count"></span>
+      </div>
+      <nav id="session-list" aria-label="Debates"></nav>
+      <section id="docs-section" class="docs-section">
+        <h2 class="sidebar-section-heading">Resources</h2>
+        <nav id="docs-list" aria-label="Documentation"></nav>
+      </section>
+      <div class="sidebar-footer">
+        <span class="workspace-icon" aria-hidden="true">d.</span>
+        <div>
+          <strong>Local workspace</strong
+          ><span>Sessions saved on this machine</span>
+        </div>
       </div>
     </aside>
-
-    <section id="detail">
-      <div id="empty" class="empty">Pick a session, or start a new debate.</div>
-
-      <form id="new-form" hidden>
-        <h2>New debate</h2>
-        <label>Idea or brief
-          <textarea id="idea" rows="4" placeholder="e.g. should we adopt trunk-based development?"></textarea>
-        </label>
-        <label>Document shape
-          <select id="template"></select>
-        </label>
-        <div class="grid2">
-          <label>Roster
-            <select id="profile"></select>
-          </label>
-          <label>Budget cap (USD)
-            <input id="budget" type="number" step="0.5" min="0" placeholder="default">
-          </label>
+    <button
+      id="sidebar-scrim"
+      aria-label="Close navigation"
+      tabindex="-1"
+      hidden
+    ></button>
+    <div class="main-shell">
+      <header class="topbar">
+        <div class="topbar-location">
+          <button
+            id="sidebar-toggle"
+            class="icon-button"
+            aria-label="Open navigation"
+            aria-controls="sidebar"
+            aria-expanded="false"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.6"
+              aria-hidden="true"
+            >
+              <path d="M4 6h16M4 12h16M4 18h16" />
+            </svg></button
+          ><span class="workspace-label">Workspace</span
+          ><span class="breadcrumb-divider" aria-hidden="true">/</span
+          ><span id="breadcrumb">Overview</span>
         </div>
-        <label>Context <span class="hint">(optional — facts the models must treat as settled)</span>
-          <textarea id="context" rows="3" placeholder="e.g. We already run Postgres 16."></textarea>
-        </label>
-        <div class="row">
-          <button type="submit" class="primary">Start debate</button>
-          <button type="button" id="cancel-new">Cancel</button>
+        <div class="topbar-right">
+          <span id="demo-badge" class="demo-badge" hidden
+            >Demo · sample debates</span
+          ><span class="local-indicator"><i aria-hidden="true"></i> Local</span>
+        </div>
+      </header>
+      <main id="detail" tabindex="-1">
+        <div id="global-error" class="notice error-notice" role="alert" hidden>
+          <span id="global-error-text"></span
+          ><button id="retry-btn" class="text-button">Try again</button>
+        </div>
+        <section id="empty" class="welcome">
+          <div class="welcome-copy">
+            <div class="eyebrow">
+              <span class="tiny-mark" aria-hidden="true">✳</span> A little
+              perspective goes a long way
+            </div>
+            <h1>Think it through.<br /><em>Together.</em></h1>
+            <p>
+              Bring an idea. Let different models question it, refine it, and
+              turn it into a plan you can stand behind.
+            </p>
+            <div class="welcome-actions">
+              <button id="welcome-new" class="primary">
+                Start a debate <span aria-hidden="true">↗</span></button
+              ><button id="welcome-docs" class="text-button">
+                How Duet works <span aria-hidden="true">→</span>
+              </button>
+            </div>
+          </div>
+          <div class="starter-section">
+            <div class="section-heading">
+              <h2>A starting point, if you need one</h2>
+              <span>Make it yours</span>
+            </div>
+            <div class="starter-grid">
+              <button
+                class="starter"
+                data-template="software"
+                data-prompt="A simple reading tracker for books and articles, with tags, reading status, and a weekly summary."
+              >
+                <span class="starter-top"
+                  ><span class="starter-icon" aria-hidden="true">⌘</span
+                  ><span class="starter-kind">Implementation spec</span
+                  ><span class="starter-arrow" aria-hidden="true"
+                    >↗</span
+                  ></span
+                ><strong>From idea to something buildable.</strong
+                ><span>Explore a simple reading tracker.</span>
+              </button>
+              <button
+                class="starter"
+                data-template="decision"
+                data-prompt="Should our small engineering team adopt trunk-based development? Compare the options, trade-offs, and a gradual rollout."
+              >
+                <span class="starter-top"
+                  ><span class="starter-icon" aria-hidden="true">⇄</span
+                  ><span class="starter-kind">Decision record</span
+                  ><span class="starter-arrow" aria-hidden="true"
+                    >↗</span
+                  ></span
+                ><strong>Give a big decision a second look.</strong
+                ><span>Weigh a new development workflow.</span>
+              </button>
+              <button
+                class="starter"
+                data-template="design"
+                data-prompt="Design an onboarding experience for new engineers that helps them make a meaningful contribution in their first week."
+              >
+                <span class="starter-top"
+                  ><span class="starter-icon" aria-hidden="true">◇</span
+                  ><span class="starter-kind">Design brief</span
+                  ><span class="starter-arrow" aria-hidden="true"
+                    >↗</span
+                  ></span
+                ><strong>Find the shape of a better experience.</strong
+                ><span>Rethink the first week on a team.</span>
+              </button>
+            </div>
+          </div>
+          <div class="welcome-note">
+            <span aria-hidden="true">◎</span> Different perspectives. A shared
+            draft. The final decision is yours.
+          </div>
+        </section>
+        <section id="session" hidden>
+          <div id="session-head" class="session-heading"></div>
+          <div class="session-toolbar">
+            <div id="tabs" role="tablist" aria-label="Session view">
+              <button
+                id="debate-tab"
+                data-tab="debate"
+                class="tab active"
+                role="tab"
+                aria-controls="tab-debate"
+                aria-selected="true"
+              >
+                Conversation</button
+              ><button
+                id="document-tab"
+                data-tab="document"
+                class="tab"
+                role="tab"
+                aria-controls="tab-document"
+                aria-selected="false"
+                tabindex="-1"
+              >
+                Document
+              </button>
+            </div>
+            <button id="export-btn" class="text-button export-button">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+                aria-hidden="true"
+              >
+                <path d="M12 3v12m-4-4 4 4 4-4M5 16v5h14v-5" />
+              </svg>
+              Export <span class="export-suffix">Markdown</span>
+            </button>
+          </div>
+          <div
+            id="tab-debate"
+            class="debate-grid"
+            role="tabpanel"
+            aria-labelledby="debate-tab"
+          >
+            <div class="debate-main">
+              <div id="summary"></div>
+              <div
+                id="live-status"
+                class="live-status"
+                role="status"
+                hidden
+              ></div>
+              <section class="conversation">
+                <div class="section-heading">
+                  <h2>The conversation</h2>
+                  <span id="timeline-status"></span>
+                </div>
+                <div id="timeline"></div>
+              </section>
+            </div>
+            <aside class="review-rail" aria-label="Review and session details">
+              <div id="gate"></div>
+              <div id="session-info" class="session-info"></div>
+            </aside>
+          </div>
+          <div
+            id="tab-document"
+            role="tabpanel"
+            aria-labelledby="document-tab"
+            hidden
+          >
+            <div class="reader-heading">
+              <span class="eyebrow">The working document</span
+              ><span id="doc-info"></span>
+            </div>
+            <div class="doc-layout">
+              <nav id="doc-nav" aria-label="Document sections"></nav>
+              <article id="doc" class="markdown"></article>
+            </div>
+          </div>
+        </section>
+        <section id="docview" hidden>
+          <div class="eyebrow">The Duet handbook</div>
+          <h1 id="docview-title"></h1>
+          <div class="doc-layout">
+            <nav id="docview-nav" aria-label="Documentation sections"></nav>
+            <article id="docview-body" class="markdown"></article>
+          </div>
+        </section>
+      </main>
+    </div>
+    <dialog
+      id="new-dialog"
+      class="dialog new-dialog"
+      aria-labelledby="new-title"
+    >
+      <form id="new-form">
+        <div class="dialog-top">
+          <span class="eyebrow">A new perspective</span
+          ><button
+            type="button"
+            id="close-new"
+            class="icon-button close-button"
+            aria-label="Close new debate"
+          >
+            ×
+          </button>
+        </div>
+        <h2 id="new-title">What are you thinking about?</h2>
+        <p class="dialog-description">
+          A rough idea is enough. The models will work through the details.
+        </p>
+        <label for="idea">Your idea or brief</label
+        ><textarea
+          id="idea"
+          rows="4"
+          required
+          placeholder="I’d like to build, decide, or explore…"
+        ></textarea
+        ><label for="template">What should come out of it?</label
+        ><select id="template" aria-describedby="template-description"></select>
+        <p id="template-description" class="field-help"></p>
+        <div class="grid2">
+          <div>
+            <label for="profile">Model profile</label
+            ><select id="profile"></select>
+          </div>
+          <div>
+            <label for="budget"
+              >Spending limit <span class="optional">USD</span></label
+            ><input
+              id="budget"
+              type="number"
+              step="0.01"
+              min="0.01"
+              placeholder="Default limit"
+              aria-describedby="budget-help"
+            />
+          </div>
+        </div>
+        <p id="budget-help" class="field-help">
+          The debate pauses at its spending limit. You can raise it later.
+        </p>
+        <details class="context-disclosure">
+          <summary>
+            Add background and constraints <span>Optional</span>
+          </summary>
+          <label class="sr-only" for="context">Background and constraints</label
+          ><textarea
+            id="context"
+            rows="4"
+            placeholder="Existing systems, decisions already made, or requirements to preserve…"
+          ></textarea>
+          <p class="field-help">
+            This material is treated as settled context throughout the debate.
+          </p>
+        </details>
+        <div id="new-error" class="inline-error" role="alert" hidden></div>
+        <div class="dialog-actions">
+          <button type="button" id="cancel-new" class="secondary">Cancel</button
+          ><button type="submit" id="start-debate" class="primary">
+            Start debate <span aria-hidden="true">↗</span>
+          </button>
         </div>
       </form>
-
-      <div id="session" hidden>
-        <nav id="tabs">
-          <button data-tab="debate" class="tab active">Debate</button>
-          <button data-tab="document" class="tab">Document</button>
-        </nav>
-
-        <div id="tab-debate">
-          <div id="session-head"></div>
-          <div id="summary"></div>
-          <div id="gate"></div>
-          <h3>Debate</h3>
-          <div id="timeline"></div>
+    </dialog>
+    <dialog
+      id="action-dialog"
+      class="dialog"
+      aria-labelledby="action-title"
+      aria-describedby="action-description"
+    >
+      <form id="action-form">
+        <div class="dialog-top">
+          <span id="action-kicker" class="eyebrow">Your decision</span
+          ><button
+            type="button"
+            id="close-action"
+            class="icon-button close-button"
+            aria-label="Close decision"
+          >
+            ×
+          </button>
         </div>
-
-        <div id="tab-document" hidden>
-          <div id="doc-nav"></div>
-          <article id="doc"></article>
+        <h2 id="action-title"></h2>
+        <p id="action-description" class="dialog-description"></p>
+        <label id="feedback-label" for="feedback">What should change?</label
+        ><textarea id="feedback" rows="5"></textarea
+        ><label id="edit-label" for="edited-markdown">Edit document</label
+        ><textarea id="edited-markdown" rows="14" spellcheck="false"></textarea>
+        <div id="action-error" class="inline-error" role="alert" hidden></div>
+        <div class="dialog-actions">
+          <button type="button" id="cancel-action" class="secondary">
+            Cancel</button
+          ><button type="submit" id="confirm-action" class="primary">
+            Confirm
+          </button>
         </div>
-      </div>
-
-      <div id="docview" hidden>
-        <h2 id="docview-title"></h2>
-        <div class="doc-layout">
-          <div id="docview-nav"></div>
-          <article id="docview-body"></article>
-        </div>
-      </div>
-    </section>
-  </main>
-
-  <script src="/app.js"></script>
-</body>
+      </form>
+    </dialog>
+    <script src="/app.js"></script>
+  </body>
 </html>

@@ -14,6 +14,7 @@ EventType = Literal[
     "model_response",
     "model_chunk",
     "draft",
+    "artifact_revision",
     "verdict",
     "tool_call",
     "tool_result",

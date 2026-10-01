@@ -5,12 +5,13 @@ process that never saw the debate.
 """
 
 from pathlib import Path
+import hashlib
 
 import pytest
 
 from tests.conftest import FakeProvider, agrees, objects, parsed, roster, spec
 
-from duet.orchestrator.machine import Machine, submit_gate_decision
+from duet.orchestrator.machine import GateConflict, Machine, submit_gate_decision
 from duet.store.session import SessionStore
 
 CONSENSUS_SCRIPT = {
@@ -66,6 +67,51 @@ def test_gate_decision_is_pinned_to_the_draft_it_answers(tmp_path: Path):
     submit_gate_decision(store, action="approve", actor="mauro")
     decision = [e for e in store.events() if e.type == "gate_decision"][0]
     assert decision.payload["draft_hash"] == result.gate.draft_hash
+    assert decision.payload["gate_seq"] == result.gate.gate_seq
+
+
+def test_gate_helper_rejects_a_stale_expected_version(tmp_path: Path):
+    machine, store = machine_for(roster("sol", "opus"), tmp_path, CONSENSUS_SCRIPT)
+    result = machine.start("an app")
+    with pytest.raises(GateConflict, match="gate has changed"):
+        submit_gate_decision(store, action="approve", actor="mauro", expected_draft_hash="old")
+    with pytest.raises(GateConflict, match="gate has changed"):
+        submit_gate_decision(store, action="approve", actor="mauro",
+                             expected_draft_hash=result.gate.draft_hash,
+                             expected_gate_seq=result.gate.gate_seq + 1)
+    assert not any(e.type == "gate_decision" for e in store.events())
+
+
+def test_resume_rejects_a_decision_for_different_text(tmp_path: Path):
+    machine, store = machine_for(roster("sol", "opus"), tmp_path, CONSENSUS_SCRIPT)
+    machine.start("an app")
+    store.append("gate_decision", {"gate": "gate_1", "action": "approve", "actor": "mauro",
+                                  "draft_hash": "stale"})
+    with pytest.raises(GateConflict, match="does not match"):
+        machine.advance()
+    assert machine.current_state() == "GATE_1"
+
+
+def test_edit_revision_recovery_is_idempotent(tmp_path: Path):
+    cfg = roster("sol", "opus")
+    machine, store = machine_for(cfg, tmp_path, CONSENSUS_SCRIPT)
+    result = machine.start("an app")
+    edited = "# A recovered edit\n\nFIXED: work offline."
+    submit_gate_decision(store, action="edit", actor="mauro", edited_markdown=edited,
+                         expected_gate_seq=result.gate.gate_seq,
+                         expected_draft_hash=result.gate.draft_hash)
+    # The process stopped after logging the canonical revision, before writing
+    # the artifact or transitioning to DONE. Resume must finish both steps.
+    store.append("artifact_revision", {
+        "artifact": "artifacts/IMPLEMENTATION.md", "markdown": edited,
+        "hash": hashlib.sha256(edited.encode()).hexdigest()[:12],
+        "previous_hash": result.gate.draft_hash, "actor": "mauro",
+        "gate_seq": result.gate.gate_seq,
+    })
+    fresh = SessionStore(store.session_id, root=tmp_path)
+    assert Machine(cfg, fresh, {}).advance().state == "DONE"
+    assert (fresh.dir / "artifacts" / "IMPLEMENTATION.md").read_text() == edited
+    assert sum(e.type == "artifact_revision" for e in fresh.events()) == 1
 
 
 def test_unoffered_action_is_refused(tmp_path: Path):
